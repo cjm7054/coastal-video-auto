@@ -1,0 +1,16 @@
+anthropic>=0.40
+google-genai>=1.0
+openai>=1.40
+edge-tts>=6.1
+elevenlabs>=1.0
+pillow>=10.0
+pyyaml
+python-dotenv
+requests
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+numpy
+opencv-python-headless
+transformers>=4.45
+# torch는 CPU 버전으로 별도 설치 (README 참고)

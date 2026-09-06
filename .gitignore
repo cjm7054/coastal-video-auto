@@ -1,0 +1,8 @@
+.env
+client_secret.json
+token.json
+output/
+*.log
+__pycache__/
+   .agents/
+   .gemini/

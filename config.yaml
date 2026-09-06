@@ -1,0 +1,68 @@
+# ===============================================================
+#  항만·해안 AI 해설 영상 자동 제작 설정 파일
+#  API 키는 여기 적지 말고 .env 파일에 넣으세요.
+# ===============================================================
+
+channel:
+  name: "바다와 항만 이야기"          # 채널명 (대본 인트로/아웃트로에 사용)
+  language: "ko"
+  target_minutes: 8                  # 목표 영상 길이(분). 8분 이상이면 미드롤 광고 가능
+  scenes: 18                         # 장면 수 (장면당 이미지 1장, 약 25~30초)
+
+script:
+  model: "claude-sonnet-4-6"
+  # 대본의 관점·톤. 전문가 채널이지만 시청자는 일반인이라는 점을 명시
+  persona: >
+    30년 경력 항만·해안 토목 엔지니어가 일반인에게 들려주는 이야기.
+    쉬운 비유로 시작하고, 공학적 원리·수치·실제 사례로 깊이 들어간다.
+    첫 15초 안에 궁금증(훅)을 던지고, 마지막에 다음 영상 예고로 마무리.
+
+images:
+  provider: "gemini"                 # gemini | openai
+  gemini_model: "gemini-3.1-flash-image-preview"
+  openai_model: "dall-e-3"
+  width: 1920
+  height: 1080
+  # 모든 이미지에 공통 적용되는 스타일 (신비한 건축사전 스타일의 단면도)
+  style_suffix: >
+    photorealistic 3D cutaway cross-section render, cinematic lighting,
+    dark moody background, engineering visualization, extremely detailed,
+    isometric or side view, no text, no watermark, 16:9
+
+tts:
+  provider: "edge"                   # edge(무료) | elevenlabs(유료, 고품질)
+  edge_voice: "ko-KR-InJoonNeural"   # 남성. 여성: ko-KR-SunHiNeural
+  rate: "+5%"
+  elevenlabs_voice_id: ""
+  elevenlabs_model: "eleven_multilingual_v2"
+
+video_gen:                           # 핵심 장면 AI 동영상 (Veo 3.1 Lite, image-to-video)
+  enabled: true
+  model: "veo-3.1-lite-generate-preview"
+  max_scenes: 6                      # 편당 AI 동영상 장면 수 상한 (비용 = 8초 × 약 70원 × 장면 수)
+  seconds: 8
+  resolution: "1080p"                # 1080p는 8초만 가능. 720p로 낮추면 절반 가격
+  slow_factor: 0.8                   # 클립 재생 속도(0.8 = 20% 느리게 → 10초)
+  style_suffix: >
+    slow cinematic camera movement, realistic physics, water and particles moving naturally,
+    no text, no people, engineering visualization
+
+video:
+  fps: 24
+  parallax_strength: 0.045           # 2.5D 패럴랙스 세기 (0.03 은은함 ~ 0.07 강함)
+  dust_opacity: 0.55                 # 부유물 파티클 밝기 0~1 (0이면 끔)
+  subtitle_font: "assets/fonts/NotoSansCJK-Bold.ttc"
+  subtitle_size: 64
+  bgm_volume: 0.08                   # 0~1
+  bgm_dir: "assets/bgm"
+
+thumbnail:
+  font: "assets/fonts/NotoSansCJK-Black.ttc"
+  font_size: 170
+
+youtube:
+  privacy: "public"                  # public | unlisted | private
+  category_id: "27"                  # 27 = Education
+  default_tags: ["항만", "해안", "토목", "방파제", "해안침식", "바다"]
+  client_secret: "client_secret.json"
+  token_file: "token.json"
