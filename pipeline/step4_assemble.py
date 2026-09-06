@@ -108,8 +108,6 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
         fc.append(f"[1:v]scale={W}:{H},lutyuv=y='val*{dust_op:.3f}',format=gbrp[d];"
                   f"{vin}format=gbrp[base];[base][d]blend=all_mode=screen:shortest=1,format=yuv420p[vd]")
         vin = "[vd]"
-    # FFmpeg 필터체인 연결: [stream]filter[output]
-    fc.append(f"{vin}{sub}[vout]")
     bgms = list((ROOT / cfg["video"]["bgm_dir"]).glob("*.mp3"))
     amap = ["-map", "0:a"]
     if bgms:
@@ -119,11 +117,28 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
         inputs += ["-stream_loop", "-1", "-i", chosen.name]
         fc.append(f"[{idx}:a]volume={cfg['video']['bgm_volume']}[b];[0:a][b]amix=inputs=2:duration=first:dropout_transition=2[aout]")
         amap = ["-map", "[aout]"]
-    r = subprocess.run(["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc), "-map", "[vout]", *amap,
-          "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-c:a", "aac",
-          "-movflags", "+faststart", "final.mp4"], cwd=str(tmp), capture_output=True, text=True)
+
+    # 1차 시도: 자막 포함 렌더링
+    fc_with_sub = fc + [f"{vin}{sub}[vout]"]
+    cmd = ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc_with_sub), "-map", "[vout]", *amap,
+           "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-c:a", "aac",
+           "-movflags", "+faststart", "final.mp4"]
+    r = subprocess.run(cmd, cwd=str(tmp), capture_output=True, text=True)
+
+    # 2차 시도 (자막 필터 실패 시): 자막 없이 기본 영상으로 완료 (유튜브 자체 자막 또는 다음 런을 위해 파이프라인 완주)
     if r.returncode != 0:
-        raise RuntimeError(r.stderr[-3000:])
+        log.warning(f"자막 필터 에러 감지 ({r.stderr[-300:].strip()}) → 자막 필터 제외하고 영상 완성 진행")
+        fc_no_sub = fc + [f"{vin}copy[vout]"] if vin != "[0:v]" else fc
+        vout_map = "[vout]" if vin != "[0:v]" else "0:v"
+        cmd2 = ["ffmpeg", "-y", *inputs]
+        if fc_no_sub:
+            cmd2 += ["-filter_complex", ";".join(fc_no_sub)]
+        cmd2 += ["-map", vout_map, *amap, "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium",
+                 "-crf", "20", "-c:a", "aac", "-movflags", "+faststart", "final.mp4"]
+        r2 = subprocess.run(cmd2, cwd=str(tmp), capture_output=True, text=True)
+        if r2.returncode != 0:
+            raise RuntimeError(r2.stderr[-3000:])
+
     final = out_dir / "final.mp4"
     shutil.move(str(tmp / "final.mp4"), str(final))
     shutil.rmtree(tmp, ignore_errors=True)
