@@ -108,6 +108,7 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
         fc.append(f"[1:v]scale={W}:{H},lutyuv=y='val*{dust_op:.3f}',format=gbrp[d];"
                   f"{vin}format=gbrp[base];[base][d]blend=all_mode=screen:shortest=1,format=yuv420p[vd]")
         vin = "[vd]"
+    # FFmpeg 필터체인 연결: [stream]filter[output]
     fc.append(f"{vin}{sub}[vout]")
     bgms = list((ROOT / cfg["video"]["bgm_dir"]).glob("*.mp3"))
     amap = ["-map", "0:a"]
