@@ -92,10 +92,12 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
             if f.is_file():
                 shutil.copy(f, tmp / f.name)
 
-    # FFmpeg는 cwd=tmp 안에서 실행되므로, 현재 디렉터리의 subs.srt를 직접 지정한다.
+    # FFmpeg libass 자막 필터:
+    # 1) filename= 옵션 키 없이 파일명을 넘겨야 호환됩니다: subtitles='subs.srt'
+    # 2) cwd=tmp 이므로 상대경로 'subs.srt'와 fontsdir='.'을 작은따옴표로 감싸서 전달합니다.
     style = (f"FontName=Noto Sans CJK KR,FontSize={cfg['video']['subtitle_size']//2},Bold=1,"
              f"PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=60")
-    sub = f"subtitles=filename=subs.srt:fontsdir=.:force_style='{style}'"
+    sub = f"subtitles='subs.srt':fontsdir='.':force_style='{style}'"
 
     inputs = ["-i", "joined.mp4"]
     fc, vin = [], "[0:v]"
