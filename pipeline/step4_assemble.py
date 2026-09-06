@@ -82,14 +82,16 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
     _concat(parts, joined)
     total = _dur(joined)
 
-    # FFmpeg subtitles 필터는 경로에 콜론(:)이나 백슬래시(\)가 포함될 경우 에러가 나므로
-    # 절대경로(posix)로 변환하고 특수문자를 이스케이프한다.
-    subs_file = (tmp / "subs.srt").resolve().as_posix()
-    subs_escaped = subs_file.replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
+    # 자막 파일 복사 (반드시 파일이 존재하는 상태에서 resolve)
+    subs_dest = tmp / "subs.srt"
+    shutil.copy(out_dir / "subtitles.srt", subs_dest)
+
+    # FFmpeg subtitles 필터용 경로 이스케이프
+    subs_posix = subs_dest.resolve().as_posix()
+    subs_escaped = subs_posix.replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
     fonts_dir = tmp.resolve().as_posix().replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
 
     font_dir = (ROOT / cfg["video"]["subtitle_font"]).resolve().parent
-    shutil.copy(out_dir / "subtitles.srt", tmp / "subs.srt")
     if font_dir.exists() and font_dir != tmp:
         for f in font_dir.glob("*"):
             if f.is_file():
