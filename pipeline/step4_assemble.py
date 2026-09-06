@@ -86,19 +86,16 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
     subs_dest = tmp / "subs.srt"
     shutil.copy(out_dir / "subtitles.srt", subs_dest)
 
-    # FFmpeg subtitles 필터용 경로 이스케이프
-    subs_posix = subs_dest.resolve().as_posix()
-    subs_escaped = subs_posix.replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
-    fonts_dir = tmp.resolve().as_posix().replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
-
     font_dir = (ROOT / cfg["video"]["subtitle_font"]).resolve().parent
     if font_dir.exists() and font_dir != tmp:
         for f in font_dir.glob("*"):
             if f.is_file():
                 shutil.copy(f, tmp / f.name)
+
+    # FFmpeg는 cwd=tmp 안에서 실행되므로, 현재 디렉터리의 subs.srt를 직접 지정한다.
     style = (f"FontName=Noto Sans CJK KR,FontSize={cfg['video']['subtitle_size']//2},Bold=1,"
              f"PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=60")
-    sub = f"subtitles='{subs_escaped}':fontsdir='{fonts_dir}':force_style='{style}'"
+    sub = f"subtitles=filename=subs.srt:fontsdir=.:force_style='{style}'"
 
     inputs = ["-i", "joined.mp4"]
     fc, vin = [], "[0:v]"
