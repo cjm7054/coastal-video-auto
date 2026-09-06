@@ -93,11 +93,11 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
                 shutil.copy(f, tmp / f.name)
 
     # FFmpeg libass 자막 필터:
-    # 1) filename= 옵션 키 없이 파일명을 넘겨야 호환됩니다: subtitles='subs.srt'
-    # 2) cwd=tmp 이므로 상대경로 'subs.srt'와 fontsdir='.'을 작은따옴표로 감싸서 전달합니다.
+    # 윈도우/리눅스 공통으로 subtitles=subs.srt (따옴표 없음) 형태로 넘겨야
+    # libass가 따옴표 자체를 파일 이름으로 해석하지 않고 정상 로드합니다.
     style = (f"FontName=Noto Sans CJK KR,FontSize={cfg['video']['subtitle_size']//2},Bold=1,"
              f"PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=60")
-    sub = f"subtitles='subs.srt':fontsdir='.':force_style='{style}'"
+    sub = f"subtitles=subs.srt:fontsdir=.:force_style='{style}'"
 
     inputs = ["-i", "joined.mp4"]
     fc, vin = [], "[0:v]"
