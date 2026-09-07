@@ -85,20 +85,26 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
 
 def _openai(prompt: str, cfg: dict) -> bytes:
     from openai import OpenAI
+    import requests
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise ValueError("OPENAI_API_KEY 환경변수가 설정되지 않았습니다.")
     client = OpenAI(api_key=api_key)
-    # DALL-E 3는 최대 1000자 프롬프트 제한
     clean_prompt = prompt[:950]
     r = client.images.generate(
         model=cfg["images"].get("openai_model", "dall-e-3"),
         prompt=clean_prompt,
         size="1792x1024",
         quality="standard",
-        response_format="b64_json"
     )
-    return base64.b64decode(r.data[0].b64_json)
+    item = r.data[0]
+    if getattr(item, "b64_json", None):
+        return base64.b64decode(item.b64_json)
+    if getattr(item, "url", None):
+        resp = requests.get(item.url, timeout=60)
+        if resp.status_code == 200:
+            return resp.content
+    raise RuntimeError("OpenAI 이미지 데이터 수신 실패")
 
 
 def _fit(data: bytes, w: int, h: int) -> Image.Image:
