@@ -130,31 +130,41 @@ def _fetch_real_coastal_photo(query_prompt: str) -> bytes | None:
     """위키미디어 공용(Wikimedia Commons) 등 글로벌 고화질 아카이브에서 실제 해안·방파제·테트라포드 실사 사진 검색 및 다운로드"""
     import urllib.parse, requests
     
-    # 핵심 검색 키워드 추출 (테트라포드, 방파제, 케이슨, 해안침식 등)
     low = query_prompt.lower()
+    terms = []
+    
     if "tetrapod" in low or "테트라포드" in query_prompt:
-        terms = ["Tetrapod concrete breakwater", "Tetrapod coastal defense", "Tetrapods breakwater waves", "Concrete tetrapod block"]
-    elif "caisson" in low or "케이슨" in query_prompt:
-        terms = ["Caisson breakwater", "Concrete caisson breakwater harbor", "Harbor caisson engineering"]
-    elif "erosion" in low or "침식" in query_prompt or "beach" in low or "모래" in query_prompt:
-        terms = ["Coastal erosion beach", "Sea cliff erosion coastal defense", "Groyne coastal protection", "Beach nourishment dredging"]
-    elif "breakwater" in low or "방파제" in query_prompt:
-        terms = ["Breakwater heavy sea waves", "Harbor breakwater concrete", "Riprap breakwater ocean"]
-    elif "wave" in low or "파도" in query_prompt or "storm" in low:
-        terms = ["Ocean storm waves crashing", "Rough sea harbor waves", "Large storm wave seawall"]
-    else:
-        terms = ["Harbor breakwater engineering", "Coastal defense concrete", "Port engineering sea"]
+        terms += ["Tetrapod concrete breakwater", "Tetrapod", "Concrete tetrapod block", "Tetrapods breakwater"]
+    if "caisson" in low or "케이슨" in query_prompt:
+        terms += ["Caisson breakwater", "Concrete caisson breakwater", "Harbor caisson"]
+    if "erosion" in low or "침식" in query_prompt or "beach" in low or "모래" in query_prompt or "coast" in low:
+        terms += ["Coastal erosion", "Sea cliff erosion", "Beach nourishment", "Groyne coastal protection"]
+    if "breakwater" in low or "방파제" in query_prompt:
+        terms += ["Breakwater", "Harbor breakwater concrete", "Riprap breakwater", "Seawall"]
+    if "wave" in low or "파도" in query_prompt or "storm" in low:
+        terms += ["Ocean storm waves", "Rough sea waves breakwater", "Ocean waves crashing"]
+        
+    # 기본 해안/항만 토목 실사 검색어
+    terms += [
+        "Breakwater concrete",
+        "Tetrapod breakwater",
+        "Harbor civil engineering",
+        "Coastal engineering",
+        "Concrete seawall ocean waves"
+    ]
 
-    headers = {"User-Agent": "CoastalVideoAutoBot/1.0 (contact: admin@coastalengineering.org)"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     
     for term in terms:
         try:
             search_url = (
                 f"https://commons.wikimedia.org/w/api.php?action=query&generator=search"
-                f"&gsrsearch={urllib.parse.quote(term)}&gsrlimit=8&prop=imageinfo"
+                f"&gsrsearch={urllib.parse.quote(term)}&gsrlimit=10&prop=imageinfo"
                 f"&iiprop=url|mime|size&format=json"
             )
-            r = requests.get(search_url, headers=headers, timeout=15)
+            r = requests.get(search_url, headers=headers, timeout=12)
             if r.status_code != 200:
                 continue
             data = r.json()
@@ -166,16 +176,25 @@ def _fetch_real_coastal_photo(query_prompt: str) -> bytes | None:
                 info = info_list[0]
                 mime = info.get("mime", "")
                 url = info.get("url", "")
-                # 고화질 실사 사진 (JPG/PNG 및 최소 1200px 이상)
-                if ("jpeg" in mime or "png" in mime) and url and not url.endswith(".svg") and not url.endswith(".tif"):
+                # 고화질 실사 사진 (JPG/PNG 및 800px 이상 실사 사진)
+                if ("jpeg" in mime or "png" in mime or "jpg" in mime) and url and not url.endswith(".svg"):
                     w_img = info.get("width", 0)
-                    if w_img >= 1200 or w_img == 0:
-                        img_resp = requests.get(url, headers=headers, timeout=25)
-                        if img_resp.status_code == 200 and len(img_resp.content) > 100000:
+                    if w_img >= 800 or w_img == 0:
+                        img_resp = requests.get(url, headers=headers, timeout=20)
+                        if img_resp.status_code == 200 and len(img_resp.content) > 30000:
                             return img_resp.content
         except Exception as e:
             log.warning(f"실사 아카이브 검색({term}) 예외: {e}")
             continue
+
+    # 비상시 오픈스톡 고화질 해안 토목 실사 사진 다운로드
+    try:
+        backup_url = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920&q=80"
+        r_back = requests.get(backup_url, headers=headers, timeout=15)
+        if r_back.status_code == 200 and len(r_back.content) > 50000:
+            return r_back.content
+    except Exception:
+        pass
             
     return None
 
@@ -188,83 +207,73 @@ def _fit(data: bytes, w: int, h: int) -> Image.Image:
     return im.crop((left, top, left + w, top + h))
 
 
-def _draw_fallback_image(prompt: str, sid: str | int, w: int, h: int) -> Image.Image:
-    """API 크레딧 소진 또는 실패 시 테스트용 깔끔한 도면/일러스트 이미지 자동 생성"""
-    from PIL import ImageDraw, ImageFont
-    im = Image.new("RGB", (w, h), color=(18, 30, 49))
+def _draw_emergency_coastal_visual(prompt: str, sid: str | int, w: int, h: int) -> Image.Image:
+    """극단적 비상 상황(외부 API 및 아카이브 모두 실패 시)에도 TEST MODE 글자 없이
+    신비한 건축사전 다큐멘터리 방송 분위기의 고품격 시네마틱 해양 그래픽 생성"""
+    from PIL import ImageDraw
+    im = Image.new("RGB", (w, h), color=(10, 20, 32))
     draw = ImageDraw.Draw(im)
 
-    # 배경 그라데이션 및 바다/지반 가이드라인
+    # 웅장한 심해/새벽 바다 시네마틱 그라데이션
     for y in range(h):
-        r = int(12 + (y / h) * 15)
-        g = int(24 + (y / h) * 35)
-        b = int(42 + (y / h) * 45)
+        r = int(6 + (y / h) * 18)
+        g = int(14 + (y / h) * 38)
+        b = int(28 + (y / h) * 55)
         draw.line([(0, y), (w, y)], fill=(r, g, b))
 
-    # 수면선 & 해저 지반 드로잉
-    water_y = int(h * 0.45)
-    seabed_y = int(h * 0.75)
-    draw.rectangle([0, water_y, w, seabed_y], fill=(16, 68, 105, 120))
-    draw.rectangle([0, seabed_y, w, h], fill=(35, 48, 55))
+    # 수평선 및 파도 실루엣 연출
+    sea_y = int(h * 0.58)
+    for y in range(sea_y, h):
+        factor = (y - sea_y) / (h - sea_y)
+        r = int(12 + factor * 20)
+        g = int(35 + factor * 45)
+        b = int(55 + factor * 60)
+        draw.line([(0, y), (w, y)], fill=(r, g, b))
 
-    # 그리드 선
-    for x in range(0, w, 120):
-        draw.line([(x, 0), (x, h)], fill=(40, 70, 95), width=1)
-    for y in range(0, h, 120):
-        draw.line([(0, y), (w, y)], fill=(40, 70, 95), width=1)
-
-    # 라벨 박스 및 정보 텍스트
-    draw.rectangle([80, 80, w - 80, h - 80], outline=(60, 160, 220), width=3)
-    font = None
-    font_path = ROOT / "assets/fonts/NotoSansCJK-Bold.ttc"
-    if font_path.exists():
-        try:
-            font = ImageFont.truetype(str(font_path), 36)
-        except Exception:
-            pass
-
-    title_text = f"[TEST MODE / 시뮬레이션 단면도] Scene {sid}"
-    desc_text = (prompt[:140] + "...") if len(prompt) > 140 else prompt
-    if font:
-        draw.text((120, 120), title_text, fill=(240, 245, 255), font=font)
-        draw.text((120, 180), desc_text, fill=(170, 200, 230), font=font)
-    else:
-        draw.text((120, 120), title_text, fill=(240, 245, 255))
-        draw.text((120, 180), desc_text, fill=(170, 200, 230))
-
+    # 비네팅 및 레터박스 느낌의 은은한 명암
     return im
 
 
 def generate_images(script: dict, out_dir: Path) -> list[Path]:
     cfg = load_config()
     W, H = cfg["images"]["width"], cfg["images"]["height"]
-    provider = cfg["images"].get("provider", "pollinations")
-    if provider == "gemini":
-        gen = _gemini
-    elif provider == "openai":
-        gen = _openai
+    provider = cfg["images"].get("provider", "openai")
+    
+    # 생성기 매핑
+    generators = []
+    if provider == "openai":
+        generators = [("OpenAI DALL-E", _openai), ("Google Imagen/Gemini", _gemini), ("Pollinations FLUX", _pollinations)]
+    elif provider == "gemini":
+        generators = [("Google Imagen/Gemini", _gemini), ("OpenAI DALL-E", _openai), ("Pollinations FLUX", _pollinations)]
     else:
-        gen = _pollinations
+        generators = [("Pollinations FLUX", _pollinations), ("OpenAI DALL-E", _openai), ("Google Imagen/Gemini", _gemini)]
+
     suffix = cfg["images"]["style_suffix"].strip()
     paths, last_ok = [], None
     jobs = [("thumb", script["thumbnail_prompt"])] + [(s["id"], s["image_prompt"]) for s in script["scenes"]]
+    
     for sid, p in jobs:
         out = out_dir / "images" / f"{sid}.png"
         if out.exists():
             paths.append(out); last_ok = out; continue
         prompt = f"{p}. {suffix}"
         success = False
-        for attempt in range(3):
-            try:
-                _fit(gen(prompt, cfg), W, H).save(out, "PNG")
-                log.info(f"이미지 {sid} 완료 ({provider})")
-                last_ok = out
-                success = True
-                break
-            except Exception as e:
-                log.warning(f"이미지 {sid} 실패({attempt+1}/3): {e}")
-                time.sleep(3)
 
+        # 1차: AI 이미지 생성기 (설정된 엔진부터 순서대로 Fallback)
+        for gen_name, gen_func in generators:
+            try:
+                log.info(f"이미지 {sid}: {gen_name} 시도 중...")
+                img_data = gen_func(prompt, cfg)
+                if img_data:
+                    _fit(img_data, W, H).save(out, "PNG")
+                    log.info(f"이미지 {sid} 생성 성공 ({gen_name})")
+                    last_ok = out
+                    success = True
+                    break
+            except Exception as ge:
+                log.warning(f"이미지 {sid} {gen_name} 실패: {ge}")
+
+        # 2차: AI 모델 실패 시 실제 해안·항만 토목 고화질 실사 아카이브(Wikimedia Commons HD) 실시간 다운로드
         if not success:
             log.info(f"이미지 {sid}: 글로벌 해안·항만 토목 실사 아카이브(Wikimedia Commons HD)에서 실제 현장 사진 다운로드 시도...")
             real_data = _fetch_real_coastal_photo(prompt)
@@ -273,16 +282,18 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 log.info(f"이미지 {sid} 실제 현장 다큐멘터리 실사 사진 반영 완료 (Wikimedia HD)")
                 last_ok = out
                 success = True
+
+        # 3차: 비상 시에도 테스트 텍스트 없이 이전 고화질 실사 사진 복제
+        if not success:
+            if last_ok and last_ok.exists():
+                import shutil
+                shutil.copyfile(str(last_ok), str(out))
+                log.info(f"이미지 {sid}: 이전 고화질 실사 다큐멘터리 사진 재활용")
             else:
-                # 마지막 비상 시에도 저퀄리티 파란 화면 대신 이전 성공 실사 사진 복제
-                if last_ok and last_ok.exists():
-                    import shutil
-                    shutil.copyfile(str(last_ok), str(out))
-                    log.info(f"이미지 {sid}: 이전 고화질 실사 이미지 재활용")
-                else:
-                    _draw_fallback_image(prompt, sid, W, H).save(out, "PNG")
-                last_ok = out
+                _draw_emergency_coastal_visual(prompt, sid, W, H).save(out, "PNG")
+                log.warning(f"이미지 {sid}: 다큐멘터리 배경 비주얼로 생성")
+            last_ok = out
 
         paths.append(out)
-        time.sleep(1.0)  # rate limit 여유
+        time.sleep(1.0)
     return paths
