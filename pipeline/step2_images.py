@@ -5,29 +5,8 @@ from PIL import Image
 from .common import load_config, ROOT, log
 
 
-def _pollinations(prompt: str, cfg: dict) -> bytes:
-    """무료 Pollinations AI (FLUX 모델) 연동: 실제 항만·해안 토목 구조물 실사 스타일 최우선 반영"""
-    import urllib.parse, requests
-    w, h = cfg["images"]["width"], cfg["images"]["height"]
-    
-    # 뜬금없는 건축물/판타지를 배제하고 실제 콘크리트 테트라포드 및 방파제 해안토목 실사 키워드 주입
-    core_style = (
-        "National Geographic documentary photo, real coastal engineering infrastructure, "
-        "authentic concrete tetrapod blocks interlocking on shoreline breakwater, heavy ocean waves crashing, "
-        "hyperrealistic 8k, raw industrial concrete, civil engineering photography, no futuristic buildings, "
-        "no fictional structures, no CGI cartoon"
-    )
-    full_prompt = f"{prompt}, {core_style}"
-    encoded = urllib.parse.quote(full_prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&model=flux&nologo=true&seed={int(time.time()*1000)%100000}"
-    resp = requests.get(url, timeout=50)
-    if resp.status_code == 200 and resp.content:
-        return resp.content
-    raise RuntimeError(f"Pollinations 실패 (HTTP {resp.status_code})")
-
-
 def _gemini(prompt: str, cfg: dict) -> bytes:
-    """Google 공식 최신 이미지 생성 API (Imagen 4 / Imagen 3 / Gemini 3.1 Flash Image)"""
+    """Google 공식 최신 이미지 생성 API (Imagen 3 / 4 / Gemini Flash Image)"""
     from google import genai
     from google.genai import types
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -36,11 +15,11 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
     
     client = genai.Client(api_key=api_key)
     
-    # 1. Imagen 전용 모델 우선 시도 (imagen-3.0-generate-002, imagen-4.0-generate-001)
+    # 1. Imagen 전용 모델 우선 시도
     models_to_try = [
         cfg["images"].get("gemini_model", "imagen-3.0-generate-002"),
-        "imagen-4.0-generate-001",
         "imagen-3.0-generate-002",
+        "imagen-4.0-generate-001",
     ]
     seen = set()
     for m in models_to_try:
@@ -127,30 +106,38 @@ def _openai(prompt: str, cfg: dict) -> bytes:
 
 
 def _fetch_real_coastal_photo(query_prompt: str) -> bytes | None:
-    """위키미디어 공용(Wikimedia Commons) 등 글로벌 고화질 아카이브에서 실제 해안·방파제·테트라포드 실사 사진 검색 및 다운로드"""
+    """위키미디어 공용(Wikimedia Commons) 등 글로벌 고화질 아카이브에서 실제 해안·항만·준설·방파제 실사 사진 검색 및 다운로드"""
     import urllib.parse, requests
     
     low = query_prompt.lower()
     terms = []
     
+    # 준설 및 항만 선박 관련 키워드
+    if "dredg" in low or "준설" in query_prompt:
+        terms += [
+            "Dredging ship", "Trailing suction hopper dredger", "Dredger harbor",
+            "Cutter suction dredger", "Harbor dredging operation", "Dredging vessel"
+        ]
     if "tetrapod" in low or "테트라포드" in query_prompt:
         terms += ["Tetrapod concrete breakwater", "Tetrapod", "Concrete tetrapod block", "Tetrapods breakwater"]
     if "caisson" in low or "케이슨" in query_prompt:
-        terms += ["Caisson breakwater", "Concrete caisson breakwater", "Harbor caisson"]
+        terms += ["Caisson breakwater", "Concrete caisson breakwater", "Harbor caisson construction", "Caisson marine engineering"]
     if "erosion" in low or "침식" in query_prompt or "beach" in low or "모래" in query_prompt or "coast" in low:
         terms += ["Coastal erosion", "Sea cliff erosion", "Beach nourishment", "Groyne coastal protection"]
     if "breakwater" in low or "방파제" in query_prompt:
-        terms += ["Breakwater", "Harbor breakwater concrete", "Riprap breakwater", "Seawall"]
+        terms += ["Breakwater", "Harbor breakwater concrete", "Riprap breakwater", "Seawall ocean waves"]
     if "wave" in low or "파도" in query_prompt or "storm" in low:
-        terms += ["Ocean storm waves", "Rough sea waves breakwater", "Ocean waves crashing"]
+        terms += ["Ocean storm waves", "Rough sea waves breakwater", "Ocean waves crashing seawall"]
+    if "ship" in low or "항구" in query_prompt or "container" in low or "port" in low:
+        terms += ["Container terminal port", "Container ship in port harbor", "Harbor crane port", "Cargo ship harbor"]
         
     # 기본 해안/항만 토목 실사 검색어
     terms += [
+        "Harbor civil engineering",
+        "Coastal engineering construction",
         "Breakwater concrete",
         "Tetrapod breakwater",
-        "Harbor civil engineering",
-        "Coastal engineering",
-        "Concrete seawall ocean waves"
+        "Seawall ocean waves"
     ]
 
     headers = {
@@ -161,10 +148,10 @@ def _fetch_real_coastal_photo(query_prompt: str) -> bytes | None:
         try:
             search_url = (
                 f"https://commons.wikimedia.org/w/api.php?action=query&generator=search"
-                f"&gsrsearch={urllib.parse.quote(term)}&gsrlimit=10&prop=imageinfo"
+                f"&gsrsearch={urllib.parse.quote(term)}&gsrlimit=8&prop=imageinfo"
                 f"&iiprop=url|mime|size&format=json"
             )
-            r = requests.get(search_url, headers=headers, timeout=12)
+            r = requests.get(search_url, headers=headers, timeout=10)
             if r.status_code != 200:
                 continue
             data = r.json()
@@ -176,21 +163,20 @@ def _fetch_real_coastal_photo(query_prompt: str) -> bytes | None:
                 info = info_list[0]
                 mime = info.get("mime", "")
                 url = info.get("url", "")
-                # 고화질 실사 사진 (JPG/PNG 및 800px 이상 실사 사진)
                 if ("jpeg" in mime or "png" in mime or "jpg" in mime) and url and not url.endswith(".svg"):
                     w_img = info.get("width", 0)
-                    if w_img >= 800 or w_img == 0:
-                        img_resp = requests.get(url, headers=headers, timeout=20)
-                        if img_resp.status_code == 200 and len(img_resp.content) > 30000:
+                    if w_img >= 1000 or w_img == 0:
+                        img_resp = requests.get(url, headers=headers, timeout=15)
+                        if img_resp.status_code == 200 and len(img_resp.content) > 40000:
                             return img_resp.content
         except Exception as e:
             log.warning(f"실사 아카이브 검색({term}) 예외: {e}")
             continue
 
-    # 비상시 오픈스톡 고화질 해안 토목 실사 사진 다운로드
+    # 비상시 안정적인 고화질 해안 토목 사진 Unsplash Direct Fallback
     try:
-        backup_url = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920&q=80"
-        r_back = requests.get(backup_url, headers=headers, timeout=15)
+        backup_url = "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1920&q=85"
+        r_back = requests.get(backup_url, headers=headers, timeout=12)
         if r_back.status_code == 200 and len(r_back.content) > 50000:
             return r_back.content
     except Exception:
@@ -239,14 +225,14 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
     W, H = cfg["images"]["width"], cfg["images"]["height"]
     provider = cfg["images"].get("provider", "openai")
     
-    # 생성기 매핑
+    # 생성기 매핑 (저품질/환각을 일으키는 Pollinations는 완전 배제)
     generators = []
     if provider == "openai":
-        generators = [("OpenAI DALL-E", _openai), ("Google Imagen/Gemini", _gemini), ("Pollinations FLUX", _pollinations)]
+        generators = [("OpenAI DALL-E", _openai), ("Google Imagen/Gemini", _gemini)]
     elif provider == "gemini":
-        generators = [("Google Imagen/Gemini", _gemini), ("OpenAI DALL-E", _openai), ("Pollinations FLUX", _pollinations)]
+        generators = [("Google Imagen/Gemini", _gemini), ("OpenAI DALL-E", _openai)]
     else:
-        generators = [("Pollinations FLUX", _pollinations), ("OpenAI DALL-E", _openai), ("Google Imagen/Gemini", _gemini)]
+        generators = [("OpenAI DALL-E", _openai), ("Google Imagen/Gemini", _gemini)]
 
     suffix = cfg["images"]["style_suffix"].strip()
     paths, last_ok = [], None

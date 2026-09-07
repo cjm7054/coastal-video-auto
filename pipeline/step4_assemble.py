@@ -82,23 +82,37 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
     _concat(parts, joined)
     total = _dur(joined)
 
-    # 자막 파일 복사 (반드시 파일이 존재하는 상태에서 resolve)
-    subs_dest = tmp / "subs.srt"
-    shutil.copy(out_dir / "subtitles.srt", subs_dest)
-
-    font_dir = (ROOT / cfg["video"]["subtitle_font"]).resolve().parent
-    if font_dir.exists() and font_dir != tmp:
-        for f in font_dir.glob("*"):
-            if f.is_file():
-                shutil.copy(f, tmp / f.name)
-
-    # FFmpeg libass 자막 필터:
-    # 윈도우/리눅스 공통으로 subtitles=subs.srt (따옴표 없음) 형태로 넘겨야
-    # libass가 따옴표 자체를 파일 이름으로 해석하지 않고 정상 로드합니다.
-    # 신비한 건축사전식 자막 스타일: 가독성 극대화된 굵은 노란색/흰색 폰트, 진한 검은 외곽선
-    style = (f"FontName=Noto Sans CJK KR,FontSize={cfg['video']['subtitle_size']//2},Bold=1,"
-             f"PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=4,Shadow=2,Alignment=2,MarginV=65")
-    sub = f"subtitles=subs.srt:fontsdir=.:force_style='{style}'"
+    # 자막 파일 준비: SRT → ASS 변환 (스타일 및 폰트 호환성 극대화)
+    # 신비한 건축사전식: 굵은 노란색 본문 + 굵은 검은색 외곽선(Outline=4) + 명확한 여백
+    subs_srt = out_dir / "subtitles.srt"
+    subs_ass = tmp / "subs.ass"
+    
+    # ffmpeg를 통해 srt를 ass로 변환
+    subprocess.run(["ffmpeg", "-y", "-i", str(subs_srt), str(subs_ass)], cwd=str(tmp), capture_output=True)
+    
+    # ASS 파일에 신비한 건축사전 전용 스타일 강제 주입
+    if subs_ass.exists():
+        ass_content = subs_ass.read_text(encoding="utf-8")
+        # Style 정의 교체
+        custom_style = (
+            "Style: Default,Noto Sans CJK KR,28,&H0000FFFF,&H000000FF,&H00000000,&H80000000,"
+            "-1,0,0,0,100,100,0,0,1,4,2,2,30,30,60,1"
+        )
+        if "Style: Default" in ass_content:
+            lines = []
+            for line in ass_content.splitlines():
+                if line.startswith("Style: Default"):
+                    lines.append(custom_style)
+                else:
+                    lines.append(line)
+            subs_ass.write_text("\n".join(lines), encoding="utf-8")
+        sub_filter = "ass=subs.ass"
+    else:
+        # Fallback srt
+        shutil.copy(subs_srt, tmp / "subs.srt")
+        style = (f"FontName=Noto Sans CJK KR,FontSize={cfg['video']['subtitle_size']//2},Bold=1,"
+                 f"PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=4,Shadow=2,Alignment=2,MarginV=65")
+        sub_filter = f"subtitles=subs.srt:force_style='{style}'"
 
     inputs = ["-i", "joined.mp4"]
     fc, vin = [], "[0:v]"
@@ -119,16 +133,26 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
         fc.append(f"[{idx}:a]volume={cfg['video']['bgm_volume']}[b];[0:a][b]amix=inputs=2:duration=first:dropout_transition=2[aout]")
         amap = ["-map", "[aout]"]
 
-    # 1차 시도: 자막 포함 렌더링
-    fc_with_sub = fc + [f"{vin}{sub}[vout]"]
+    # 1차 시도: ASS 또는 SRT 자막 포함 렌더링
+    fc_with_sub = fc + [f"{vin}{sub_filter}[vout]"]
     cmd = ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc_with_sub), "-map", "[vout]", *amap,
            "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
            "-c:a", "aac", "-movflags", "+faststart", "final.mp4"]
     r = subprocess.run(cmd, cwd=str(tmp), capture_output=True, text=True)
 
-    # 2차 시도 (자막 필터 실패 시): 자막 없이 기본 영상으로 완료
+    # 2차 시도: 혹시 필터 이름이나 폰트 매핑 실패 시 subtitles 기본 필터로 재시도
     if r.returncode != 0:
-        log.warning(f"자막 필터 에러 감지 ({r.stderr[-300:].strip()}) → 자막 필터 제외하고 영상 완성 진행")
+        log.warning(f"1차 자막 필터 에러 ({r.stderr[-250:].strip()}) → srt 기본 필터로 재시도")
+        shutil.copy(subs_srt, tmp / "subs.srt")
+        fc_sub2 = fc + [f"{vin}subtitles=subs.srt[vout]"]
+        cmd_sub2 = ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc_sub2), "-map", "[vout]", *amap,
+                    "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-movflags", "+faststart", "final.mp4"]
+        r = subprocess.run(cmd_sub2, cwd=str(tmp), capture_output=True, text=True)
+
+    # 3차 비상: 자막 실패 시에도 영상은 유지
+    if r.returncode != 0:
+        log.warning(f"자막 필터 전체 실패 ({r.stderr[-200:].strip()}) → 기본 영상으로 폴백")
         fc_no_sub = fc + [f"{vin}copy[vout]"] if vin != "[0:v]" else fc
         vout_map = "[vout]" if vin != "[0:v]" else "0:v"
         cmd2 = ["ffmpeg", "-y", *inputs]

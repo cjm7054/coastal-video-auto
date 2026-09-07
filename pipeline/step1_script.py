@@ -23,12 +23,17 @@ PROMPT = """당신은 유튜브 인기 공학 정보 채널 "{channel}"의 전�
     {{
       "id": 1,
       "narration": "장면 나레이션. 구어체 존댓말, 명확한 단문 위주, 귀에 쏙쏙 박히는 아나운서 브리핑 톤.",
-      "image_prompt": "이 장면의 영문 이미지 프롬프트 (실제 항만/해안 공학 현장 실사 묘사)",
+      "image_prompt": "이 장면의 영문 이미지 프롬프트. 반드시 실제 항만/해양 공학 현장의 실사 사진 묘사 (예: Authentic documentary photograph of a real trailing suction hopper dredger ship deepening a harbor basin, heavy industrial equipment, realistic water physics, no sci-fi, no fantasy, no distorted vessels)",
       "motion": false,
       "motion_prompt": ""
     }}
   ]
 }}
+
+[이미지 프롬프트 작성 시 절대 엄수 규칙]:
+- 절대로 SF, 판타지, 왜곡된 형태의 비현실적 선박/구조물을 묘사하지 마세요.
+- 실제 항만 건설, 실제 준설선(Trailing Suction Hopper Dredger, Cutter Suction Dredger), 실제 방파제(Breakwater), 실제 테트라포드(Tetrapod) 등 실제 지구상에 존재하는 토목 공학 현장을 내셔널 지오그래픽 다큐멘터리 사진 스타일로 묘사하세요.
+- 모든 image_prompt 끝부분에 "authentic documentary photo, real engineering site, no fantasy, no CGI cartoon, no distorted structures"를 반영할 수 있는 구체적인 실제 현장 묘사를 작성하세요.
 
 [신비한 건축사전식 필수 4단계 스토리텔링 구조]:
 - 총 장면 수: 정확히 {n_scenes}개

@@ -25,11 +25,10 @@ images:
   height: 1080
   # 모든 이미지에 공통 적용되는 스타일 (실사 항만·해안 토목 엔지니어링 다큐멘터리 스타일)
   style_suffix: >
-    National Geographic documentary photograph, realistic civil engineering site,
-    concrete breakwater, real interlocking tetrapods against ocean storm waves,
-    coastal harbor infrastructure, raw industrial concrete texture, cinematic daylight,
-    hyper-realistic 8k, sharp focus, no futuristic buildings, no fictional architecture,
-    no fantasy, no cartoon, no text, 16:9
+    National Geographic documentary photograph, award winning civil engineering photography,
+    Sony A7R IV 35mm lens, raw realistic industrial lighting, authentic maritime civil engineering,
+    hyper-realistic 8k, sharp detailed textures, no fantasy, no futuristic elements, no cartoon,
+    no distorted ships, no strange structures, no text, 16:9
 
 tts:
   provider: "edge"                   # edge(무료) | elevenlabs(유료, 고품질)
