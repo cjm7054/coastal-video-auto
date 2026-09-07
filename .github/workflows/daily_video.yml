@@ -84,4 +84,5 @@ jobs:
           git config user.email "bot@users.noreply.github.com"
           git add topics.txt topics_done.txt uploaded.log 2>/dev/null || true
           git diff --cached --quiet || git commit -m "video: $(date +%F) 제작 완료"
-          git push
+          git pull --rebase origin main || true
+          git push origin main
