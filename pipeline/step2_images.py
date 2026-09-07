@@ -27,19 +27,40 @@ def _pollinations(prompt: str, cfg: dict) -> bytes:
 
 
 def _gemini(prompt: str, cfg: dict) -> bytes:
+    """Google 공식 최신 이미지 생성 API (Imagen 3 / Gemini Image)"""
     from google import genai
     from google.genai import types
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    model = cfg["images"].get("gemini_model", "imagen-3.0-generate-002")
+    
+    # 1. Imagen 전용 API 우선 시도
+    if "imagen" in model.lower():
+        resp = client.models.generate_images(
+            model=model,
+            prompt=prompt,
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio="16:9",
+                person_generation="DONT_ALLOW",
+            )
+        )
+        if resp.generated_images:
+            return resp.generated_images[0].image.image_bytes
+        raise RuntimeError("Imagen 이미지 생성 응답 없음")
+    
+    # 2. Gemini 멀티모달 생성 모델 시도
     resp = client.models.generate_content(
-        model=cfg["images"]["gemini_model"],
+        model=model,
         contents=prompt,
-        config=types.GenerateContentConfig(response_modalities=["IMAGE"],
-                                           image_config=types.ImageConfig(aspect_ratio="16:9")),
+        config=types.GenerateContentConfig(
+            response_modalities=["IMAGE"],
+            image_config=types.ImageConfig(aspect_ratio="16:9")
+        ),
     )
     for part in resp.candidates[0].content.parts:
         if part.inline_data:
             return part.inline_data.data
-    raise RuntimeError("이미지 파트 없음 (안전 필터?)")
+    raise RuntimeError("Gemini 이미지 파트 없음 (안전 필터 검열 가능성)")
 
 
 def _openai(prompt: str, cfg: dict) -> bytes:
