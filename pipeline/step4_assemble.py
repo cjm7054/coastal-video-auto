@@ -82,37 +82,54 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
     _concat(parts, joined)
     total = _dur(joined)
 
-    # 자막 파일 준비: SRT → ASS 변환 (스타일 및 폰트 호환성 극대화)
-    # 신비한 건축사전식: 굵은 노란색 본문 + 굵은 검은색 외곽선(Outline=4) + 명확한 여백
+    # 자막 파일 준비: ASS 자막 직접 생성 (신비한 건축사전식: 굵은 노란색 본문 + 굵은 검은색 외곽선 5px + 하단 중앙 배치)
     subs_srt = out_dir / "subtitles.srt"
     subs_ass = tmp / "subs.ass"
     
-    # ffmpeg를 통해 srt를 ass로 변환
-    subprocess.run(["ffmpeg", "-y", "-i", str(subs_srt), str(subs_ass)], cwd=str(tmp), capture_output=True)
-    
-    # ASS 파일에 신비한 건축사전 전용 스타일 강제 주입
-    if subs_ass.exists():
-        ass_content = subs_ass.read_text(encoding="utf-8")
-        # Style 정의 교체
-        custom_style = (
-            "Style: Default,Noto Sans CJK KR,28,&H0000FFFF,&H000000FF,&H00000000,&H80000000,"
-            "-1,0,0,0,100,100,0,0,1,4,2,2,30,30,60,1"
-        )
-        if "Style: Default" in ass_content:
-            lines = []
-            for line in ass_content.splitlines():
-                if line.startswith("Style: Default"):
-                    lines.append(custom_style)
-                else:
-                    lines.append(line)
-            subs_ass.write_text("\n".join(lines), encoding="utf-8")
-        sub_filter = "ass=subs.ass"
-    else:
-        # Fallback srt
-        shutil.copy(subs_srt, tmp / "subs.srt")
-        style = (f"FontName=Noto Sans CJK KR,FontSize={cfg['video']['subtitle_size']//2},Bold=1,"
-                 f"PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=4,Shadow=2,Alignment=2,MarginV=65")
-        sub_filter = f"subtitles=subs.srt:force_style='{style}'"
+    # SRT 파일로부터 ASS 직접 빌드 (ffmpeg srt->ass 변환 호환성 문제 원천 차단)
+    def _srt_to_ass(srt_path: Path, ass_path: Path):
+        import re
+        content = srt_path.read_text(encoding="utf-8")
+        blocks = re.split(r"\n\s*\n", content.strip())
+        
+        ass_header = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Noto Sans CJK KR,58,&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,3,2,60,60,80,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+        events = []
+        for block in blocks:
+            lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+            if len(lines) >= 3 and "-->" in lines[1]:
+                m = re.match(r"(\d+:\d+:\d+),(\d+)\s*-->\s*(\d+:\d+:\d+),(\d+)", lines[1])
+                if m:
+                    # SRT 00:00:01,234 -> ASS 0:00:01.23
+                    s_hms, s_ms, e_hms, e_ms = m.groups()
+                    s_ass = f"{int(s_hms.split(':')[0])}:{s_hms.split(':')[1]}:{s_hms.split(':')[2]}.{int(s_ms)//10:02d}"
+                    e_ass = f"{int(e_hms.split(':')[0])}:{e_hms.split(':')[1]}:{e_hms.split(':')[2]}.{int(e_ms)//10:02d}"
+                    text = "\\N".join(lines[2:])
+                    events.append(f"Dialogue: 0,{s_ass},{e_ass},Default,,0,0,0,,{text}")
+        
+        ass_path.write_text(ass_header + "\n".join(events) + "\n", encoding="utf-8")
+
+    sub_filter = None
+    if subs_srt.exists():
+        try:
+            _srt_to_ass(subs_srt, subs_ass)
+            sub_filter = "ass=subs.ass"
+        except Exception as se:
+            log.warning(f"ASS 생성 예외: {se}")
+            shutil.copy(subs_srt, tmp / "subs.srt")
+            style = "FontName=Noto Sans CJK KR,FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=5,Shadow=2,Alignment=2,MarginV=80"
+            sub_filter = f"subtitles=subs.srt:force_style='{style}'"
 
     inputs = ["-i", "joined.mp4"]
     fc, vin = [], "[0:v]"
