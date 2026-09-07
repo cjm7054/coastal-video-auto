@@ -27,40 +27,60 @@ def _pollinations(prompt: str, cfg: dict) -> bytes:
 
 
 def _gemini(prompt: str, cfg: dict) -> bytes:
-    """Google 공식 최신 이미지 생성 API (Imagen 3 / Gemini Image)"""
+    """Google 공식 최신 이미지 생성 API (Imagen 4 / Imagen 3 / Gemini 3.1 Flash Image)"""
     from google import genai
     from google.genai import types
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    model = cfg["images"].get("gemini_model", "imagen-3.0-generate-002")
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
     
-    # 1. Imagen 전용 API 우선 시도
-    if "imagen" in model.lower():
-        resp = client.models.generate_images(
-            model=model,
-            prompt=prompt,
-            config=types.GenerateImagesConfig(
-                number_of_images=1,
-                aspect_ratio="16:9",
-                person_generation="DONT_ALLOW",
+    client = genai.Client(api_key=api_key)
+    
+    # 1. Imagen 전용 모델 우선 시도 (imagen-3.0-generate-002, imagen-4.0-generate-001)
+    models_to_try = [
+        cfg["images"].get("gemini_model", "imagen-3.0-generate-002"),
+        "imagen-4.0-generate-001",
+        "imagen-3.0-generate-002",
+    ]
+    seen = set()
+    for m in models_to_try:
+        if not m or m in seen or "imagen" not in m.lower():
+            continue
+        seen.add(m)
+        try:
+            resp = client.models.generate_images(
+                model=m,
+                prompt=prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    aspect_ratio="16:9",
+                    person_generation="DONT_ALLOW",
+                )
             )
-        )
-        if resp.generated_images:
-            return resp.generated_images[0].image.image_bytes
-        raise RuntimeError("Imagen 이미지 생성 응답 없음")
+            if resp.generated_images and resp.generated_images[0].image.image_bytes:
+                return resp.generated_images[0].image.image_bytes
+        except Exception as err:
+            log.warning(f"Imagen 모델({m}) 시도 실패: {err}")
     
-    # 2. Gemini 멀티모달 생성 모델 시도
-    resp = client.models.generate_content(
-        model=model,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_modalities=["IMAGE"],
-            image_config=types.ImageConfig(aspect_ratio="16:9")
-        ),
-    )
-    for part in resp.candidates[0].content.parts:
-        if part.inline_data:
-            return part.inline_data.data
-    raise RuntimeError("Gemini 이미지 파트 없음 (안전 필터 검열 가능성)")
+    # 2. Gemini 3.1 Flash Image 멀티모달 생성 시도
+    flash_models = ["gemini-3.1-flash-image", "gemini-2.5-flash-image", "gemini-3.1-flash-image-preview"]
+    for fm in flash_models:
+        try:
+            resp = client.models.generate_content(
+                model=fm,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                    image_config=types.ImageConfig(aspect_ratio="16:9")
+                ),
+            )
+            for part in resp.candidates[0].content.parts:
+                if part.inline_data and part.inline_data.data:
+                    return part.inline_data.data
+        except Exception as ferr:
+            log.warning(f"Gemini 멀티모달 이미지({fm}) 실패: {ferr}")
+            
+    raise RuntimeError("모든 Google Gemini / Imagen 이미지 모델 생성 호출 실패")
 
 
 def _openai(prompt: str, cfg: dict) -> bytes:
