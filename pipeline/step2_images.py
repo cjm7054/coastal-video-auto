@@ -85,9 +85,19 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
 
 def _openai(prompt: str, cfg: dict) -> bytes:
     from openai import OpenAI
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-    r = client.images.generate(model=cfg["images"]["openai_model"], prompt=prompt,
-                               size="1792x1024", quality="standard", response_format="b64_json")
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY 환경변수가 설정되지 않았습니다.")
+    client = OpenAI(api_key=api_key)
+    # DALL-E 3는 최대 1000자 프롬프트 제한
+    clean_prompt = prompt[:950]
+    r = client.images.generate(
+        model=cfg["images"].get("openai_model", "dall-e-3"),
+        prompt=clean_prompt,
+        size="1792x1024",
+        quality="standard",
+        response_format="b64_json"
+    )
     return base64.b64decode(r.data[0].b64_json)
 
 
@@ -177,6 +187,8 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 time.sleep(3)
 
         if not success:
+            if provider == "openai":
+                raise RuntimeError(f"OpenAI DALL-E 3 이미지 {sid} 생성 3회 실패: API 에러 로그를 확인하세요.")
             log.warning(f"이미지 {sid} 생성 실패 → 테스트 단면도 그래픽 생성 적용")
             _draw_fallback_image(prompt, sid, W, H).save(out, "PNG")
             last_ok = out
