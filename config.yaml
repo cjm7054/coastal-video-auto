@@ -18,7 +18,7 @@ script:
     빠르고 명확한 딕션, 날카로운 질문(훅), 명쾌한 시각적 비유와 수치로 흥미진진하게 풀어낸다.
 
 images:
-  provider: "openai"                 # openai(DALL-E 3 실사 렌더링) | gemini | pollinations
+  provider: "gemini"                 # gemini (Google Imagen 3/4) | openai (DALL-E 3)
   gemini_model: "imagen-3.0-generate-002"
   openai_model: "dall-e-3"
   width: 1920

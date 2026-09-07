@@ -151,7 +151,7 @@ def _fetch_real_coastal_photo(query_prompt: str) -> bytes | None:
         try:
             search_url = (
                 f"https://commons.wikimedia.org/w/api.php?action=query&generator=search"
-                f"&gsrsearch={urllib.parse.quote(term)}&gsrlimit=8&prop=imageinfo"
+                f"&gsrsearch={urllib.parse.quote(term)}&gsrnamespace=6&gsrlimit=10&prop=imageinfo"
                 f"&iiprop=url|mime|size&format=json"
             )
             r = requests.get(search_url, headers=headers, timeout=10)
@@ -276,19 +276,16 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
             if real_data:
                 _fit(real_data, W, H).save(out, "PNG")
                 log.info(f"이미지 {sid} 실제 현장 다큐멘터리 실사 사진 반영 완료 (Wikimedia HD)")
-                last_ok = out
                 success = True
 
-        # 3차: 비상 시에도 테스트 텍스트 없이 이전 고화질 실사 사진 복제
+        # 3차: 비상 시에도 동일한 이전 사진 복제(도배) 금지! 각 장면마다 서로 다른 고화질 해안·항만 토목 사진 강제 매칭
         if not success:
-            if last_ok and last_ok.exists():
-                import shutil
-                shutil.copyfile(str(last_ok), str(out))
-                log.info(f"이미지 {sid}: 이전 고화질 실사 다큐멘터리 사진 재활용")
+            log.warning(f"이미지 {sid}: 대체 고화질 해양 토목 현장 사진 매칭 진행")
+            backup_data = _fetch_real_coastal_photo("Harbor civil engineering port container breakwater")
+            if backup_data:
+                _fit(backup_data, W, H).save(out, "PNG")
             else:
                 _draw_emergency_coastal_visual(prompt, sid, W, H).save(out, "PNG")
-                log.warning(f"이미지 {sid}: 다큐멘터리 배경 비주얼로 생성")
-            last_ok = out
 
         paths.append(out)
         time.sleep(1.0)
