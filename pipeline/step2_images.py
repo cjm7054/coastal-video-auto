@@ -15,15 +15,16 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
     
     client = genai.Client(api_key=api_key)
     
-    # 1. Imagen 전용 모델 우선 시도
+    # 1. Imagen 및 Gemini 최신 이미지 생성 모델
     models_to_try = [
         cfg["images"].get("gemini_model", "imagen-3.0-generate-002"),
         "imagen-3.0-generate-002",
         "imagen-4.0-generate-001",
+        "gemini-2.5-flash-image",
     ]
     seen = set()
     for m in models_to_try:
-        if not m or m in seen or "imagen" not in m.lower():
+        if not m or m in seen:
             continue
         seen.add(m)
         try:
@@ -36,13 +37,15 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
                     person_generation="DONT_ALLOW",
                 )
             )
-            if resp.generated_images and resp.generated_images[0].image.image_bytes:
-                return resp.generated_images[0].image.image_bytes
+            if resp.generated_images:
+                img_obj = resp.generated_images[0]
+                if getattr(img_obj, "image", None) and getattr(img_obj.image, "image_bytes", None):
+                    return img_obj.image.image_bytes
         except Exception as err:
-            log.warning(f"Imagen 모델({m}) 시도 실패: {err}")
+            log.warning(f"Google 이미지 모델({m}) generate_images 시도 실패: {err}")
     
-    # 2. Gemini 3.1 Flash Image 멀티모달 생성 시도
-    flash_models = ["gemini-3.1-flash-image", "gemini-2.5-flash-image", "gemini-3.1-flash-image-preview"]
+    # 2. Gemini 멀티모달 generate_content fallback
+    flash_models = ["gemini-2.5-flash-image", "gemini-3.1-flash-image-preview", "gemini-2.0-flash"]
     for fm in flash_models:
         try:
             resp = client.models.generate_content(
@@ -173,14 +176,21 @@ def _fetch_real_coastal_photo(query_prompt: str) -> bytes | None:
             log.warning(f"실사 아카이브 검색({term}) 예외: {e}")
             continue
 
-    # 비상시 안정적인 고화질 해안 토목 사진 Unsplash Direct Fallback
-    try:
-        backup_url = "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1920&q=85"
-        r_back = requests.get(backup_url, headers=headers, timeout=12)
-        if r_back.status_code == 200 and len(r_back.content) > 50000:
-            return r_back.content
-    except Exception:
-        pass
+    # 비상시 다양한 실제 해안·항만 토목 공학 고화질 사진 풀 (중복 방지)
+    backup_pool = [
+        "https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?w=1920&q=85",  # 항만 및 토목 현장
+        "https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=1920&q=85",  # 대형 컨테이너 및 항만 크레인
+        "https://images.unsplash.com/photo-1505705694340-019e1e335916?w=1920&q=85",  # 방파제 및 파도
+        "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1920&q=85",  # 거친 해양 파도
+    ]
+    import random
+    for b_url in random.sample(backup_pool, len(backup_pool)):
+        try:
+            r_back = requests.get(b_url, headers=headers, timeout=10)
+            if r_back.status_code == 200 and len(r_back.content) > 30000:
+                return r_back.content
+        except Exception:
+            continue
             
     return None
 
