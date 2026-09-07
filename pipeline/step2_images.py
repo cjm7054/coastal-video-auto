@@ -91,19 +91,38 @@ def _openai(prompt: str, cfg: dict) -> bytes:
         raise ValueError("OPENAI_API_KEY 환경변수가 설정되지 않았습니다.")
     client = OpenAI(api_key=api_key)
     clean_prompt = prompt[:950]
-    r = client.images.generate(
-        model=cfg["images"].get("openai_model", "dall-e-3"),
-        prompt=clean_prompt,
-        size="1792x1024",
-        quality="standard",
-    )
-    item = r.data[0]
-    if getattr(item, "b64_json", None):
-        return base64.b64decode(item.b64_json)
-    if getattr(item, "url", None):
-        resp = requests.get(item.url, timeout=60)
-        if resp.status_code == 200:
-            return resp.content
+    
+    # 1. DALL-E 3 시도 (1792x1024)
+    try:
+        r = client.images.generate(
+            model="dall-e-3",
+            prompt=clean_prompt,
+            size="1792x1024",
+            quality="standard",
+        )
+        item = r.data[0]
+        if getattr(item, "b64_json", None):
+            return base64.b64decode(item.b64_json)
+        if getattr(item, "url", None):
+            resp = requests.get(item.url, timeout=60)
+            if resp.status_code == 200:
+                return resp.content
+    except Exception as e3:
+        log.warning(f"dall-e-3 시도 실패({e3}) → dall-e-2로 재시도")
+        # 2. DALL-E 2 시도 (1024x1024)
+        r = client.images.generate(
+            model="dall-e-2",
+            prompt=clean_prompt[:400],
+            size="1024x1024",
+        )
+        item = r.data[0]
+        if getattr(item, "b64_json", None):
+            return base64.b64decode(item.b64_json)
+        if getattr(item, "url", None):
+            resp = requests.get(item.url, timeout=60)
+            if resp.status_code == 200:
+                return resp.content
+                
     raise RuntimeError("OpenAI 이미지 데이터 수신 실패")
 
 
