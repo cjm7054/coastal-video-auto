@@ -174,17 +174,6 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 break
             except Exception as e:
                 log.warning(f"이미지 {sid} 실패({attempt+1}/3): {e}")
-                # 만약 유료 API 실패 시 무료 Pollinations로 자동 우회
-                if provider != "pollinations":
-                    try:
-                        log.info(f"이미지 {sid} → 무료 Pollinations AI로 우회 생성 시도")
-                        _fit(_pollinations(prompt, cfg), W, H).save(out, "PNG")
-                        log.info(f"이미지 {sid} 무료 AI 생성 완료")
-                        last_ok = out
-                        success = True
-                        break
-                    except Exception as pe:
-                        log.warning(f"Pollinations 우회 실패: {pe}")
                 time.sleep(3)
 
         if not success:
