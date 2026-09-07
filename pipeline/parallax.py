@@ -51,17 +51,17 @@ def render_dust(duration: float, W: int, H: int, out: Path, fps=24, n=110, seed=
 
 
 def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
-                    strength=0.045):
-    """깊이 기반 픽셀 변위(cv2.remap)로 프레임을 생성. 1080p 30fps 기준 초당 약 1초 렌더.
-    mode: 0 돌리인+우측팬, 1 돌리아웃+좌측팬, 2 상승 틸트, 3 하강 틸트"""
+                    strength=0.08):
+    """깊이 기반 픽셀 변위(cv2.remap) + 다이내믹 켄 번스(Ken Burns) 카메라 무빙.
+    mode: 0 돌리인+우측팬, 1 돌리아웃+좌측팬, 2 상승 틸트+줌인, 3 하강 틸트+줌아웃"""
     import cv2
     img = Image.open(img_path).convert("RGB")
     W, H = img.size
-    pad = 1.10
+    pad = 1.25  # 카메라 이동 범위를 위해 여백 확대
     big = img.resize((int(W * pad), int(H * pad)), Image.LANCZOS)
     BW, BH = big.size
     depth = depth_map(big)
-    depth = cv2.GaussianBlur(depth, (0, 0), 6)  # 경계 찢어짐 완화
+    depth = cv2.GaussianBlur(depth, (0, 0), 7)  # 경계 찢어짐 완화
     src = np.array(big)[:, :, ::-1].copy()  # BGR for cv2
     yy, xx = np.mgrid[0:BH, 0:BW].astype(np.float32)
     cxb, cyb = BW / 2, BH / 2
@@ -72,14 +72,30 @@ def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
     cx0, cy0 = (BW - W) // 2, (BH - H) // 2
     for f in range(n):
         t = f / max(n - 1, 1)
+        # 부드러운 가감속(smooth step)
         e = 0.5 - 0.5 * math.cos(math.pi * t)
-        if mode == 0:   zoom, dx, dy = 1.0 + 0.08 * e, -0.5 + e, 0.0
-        elif mode == 1: zoom, dx, dy = 1.08 - 0.08 * e, 0.5 - e, 0.0
-        elif mode == 2: zoom, dx, dy = 1.0 + 0.05 * e, 0.0, 0.5 - e
-        else:           zoom, dx, dy = 1.05 - 0.05 * e, 0.0, -0.5 + e
-        # 깊이에 따른 변위: 가까운 픽셀은 카메라 이동 반대방향으로 더 크게
+        
+        # 뚜렷한 줌(Zoom 1.0 ~ 1.16)과 확실한 카메라 틸트/패닝 이동
+        if mode == 0:
+            zoom = 1.0 + 0.16 * e
+            dx = (-0.8 + 1.6 * e)
+            dy = (-0.3 + 0.6 * e)
+        elif mode == 1:
+            zoom = 1.16 - 0.16 * e
+            dx = (0.8 - 1.6 * e)
+            dy = (0.3 - 0.6 * e)
+        elif mode == 2:
+            zoom = 1.04 + 0.14 * e
+            dx = 0.0
+            dy = (0.8 - 1.6 * e)
+        else:
+            zoom = 1.18 - 0.14 * e
+            dx = 0.0
+            dy = (-0.8 + 1.6 * e)
+
+        # 깊이에 따른 3D 입체 변위
         par = (depth - 0.5) * 2
-        zdepth = 1.0 / (1.0 + (zoom - 1) * (0.6 + 0.8 * depth))  # 근경일수록 더 확대
+        zdepth = 1.0 / (1.0 + (zoom - 1) * (0.5 + 0.9 * depth))
         map_x = cxb + (xx - cxb) * zdepth - dx * strength * W * par
         map_y = cyb + (yy - cyb) * zdepth - dy * strength * H * par
         warped = cv2.remap(src, map_x.astype(np.float32), map_y.astype(np.float32),

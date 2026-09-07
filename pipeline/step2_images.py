@@ -6,12 +6,20 @@ from .common import load_config, ROOT, log
 
 
 def _pollinations(prompt: str, cfg: dict) -> bytes:
-    """무료 Pollinations AI (FLUX / Turbo 계열) 연동: API 키나 결제 없이 실제 이미지 생성"""
+    """무료 Pollinations AI (FLUX 모델) 연동: 3D 단면도/엔지니어링 스타일 최우선 반영"""
     import urllib.parse, requests
     w, h = cfg["images"]["width"], cfg["images"]["height"]
-    encoded = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&nologo=true&seed={int(time.time()*1000)%100000}"
-    resp = requests.get(url, timeout=45)
+    
+    # 신비한 건축사전 특유의 3D 단면도 & 시네마틱 렌더링 키워드를 최전방에 배치
+    core_style = (
+        "3D cross-section architectural cutaway render, detailed civil engineering structure diagram, "
+        "dark moody background, cinematic volumetric lighting, Unreal Engine 5 render, highly detailed, "
+        "isometric cutaway view, photorealistic"
+    )
+    full_prompt = f"{core_style}, {prompt}"
+    encoded = urllib.parse.quote(full_prompt)
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&model=flux&nologo=true&seed={int(time.time()*1000)%100000}"
+    resp = requests.get(url, timeout=50)
     if resp.status_code == 200 and resp.content:
         return resp.content
     raise RuntimeError(f"Pollinations 실패 (HTTP {resp.status_code})")
