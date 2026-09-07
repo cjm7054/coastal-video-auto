@@ -6,17 +6,18 @@ from .common import load_config, ROOT, log
 
 
 def _pollinations(prompt: str, cfg: dict) -> bytes:
-    """무료 Pollinations AI (FLUX 모델) 연동: 3D 단면도/엔지니어링 스타일 최우선 반영"""
+    """무료 Pollinations AI (FLUX 모델) 연동: 실제 항만·해안 토목 구조물 실사 스타일 최우선 반영"""
     import urllib.parse, requests
     w, h = cfg["images"]["width"], cfg["images"]["height"]
     
-    # 신비한 건축사전 특유의 3D 단면도 & 시네마틱 렌더링 키워드를 최전방에 배치
+    # 뜬금없는 건축물/판타지를 배제하고 실제 콘크리트 테트라포드 및 방파제 해안토목 실사 키워드 주입
     core_style = (
-        "3D cross-section architectural cutaway render, detailed civil engineering structure diagram, "
-        "dark moody background, cinematic volumetric lighting, Unreal Engine 5 render, highly detailed, "
-        "isometric cutaway view, photorealistic"
+        "National Geographic documentary photo, real coastal engineering infrastructure, "
+        "authentic concrete tetrapod blocks interlocking on shoreline breakwater, heavy ocean waves crashing, "
+        "hyperrealistic 8k, raw industrial concrete, civil engineering photography, no futuristic buildings, "
+        "no fictional structures, no CGI cartoon"
     )
-    full_prompt = f"{core_style}, {prompt}"
+    full_prompt = f"{prompt}, {core_style}"
     encoded = urllib.parse.quote(full_prompt)
     url = f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&model=flux&nologo=true&seed={int(time.time()*1000)%100000}"
     resp = requests.get(url, timeout=50)

@@ -52,56 +52,70 @@ def render_dust(duration: float, W: int, H: int, out: Path, fps=24, n=110, seed=
 
 def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
                     strength=0.08):
-    """깊이 기반 픽셀 변위(cv2.remap) + 다이내믹 켄 번스(Ken Burns) 카메라 무빙.
+    """왜곡 없는 고화질 시네마틱 켄 번스(Ken Burns) 카메라 무빙.
+    2D 평면을 무리하게 비틀어 생기는 젤리 현상/찢어짐을 완전히 방지하고,
+    다큐멘터리 방송 스타일의 우아하고 부드러운 고화질 줌인/줌아웃/패닝을 수행.
     mode: 0 돌리인+우측팬, 1 돌리아웃+좌측팬, 2 상승 틸트+줌인, 3 하강 틸트+줌아웃"""
     import cv2
     img = Image.open(img_path).convert("RGB")
     W, H = img.size
-    pad = 1.25  # 카메라 이동 범위를 위해 여백 확대
-    big = img.resize((int(W * pad), int(H * pad)), Image.LANCZOS)
-    BW, BH = big.size
-    depth = depth_map(big)
-    depth = cv2.GaussianBlur(depth, (0, 0), 7)  # 경계 찢어짐 완화
-    src = np.array(big)[:, :, ::-1].copy()  # BGR for cv2
-    yy, xx = np.mgrid[0:BH, 0:BW].astype(np.float32)
-    cxb, cyb = BW / 2, BH / 2
+    
+    # 여유 있는 캔버스 확장 (부드러운 카메라 패닝용)
+    pad = 1.15
+    big_w, big_h = int(W * pad), int(H * pad)
+    big = img.resize((big_w, big_h), Image.LANCZOS)
+    src = np.array(big)[:, :, ::-1]  # BGR for cv2
+    
     n = int(duration * fps)
-    cmd = ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(fps),
-           "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", str(out)]
+    cmd = ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}", "-r", str(fps),
+           "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", str(out)]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    cx0, cy0 = (BW - W) // 2, (BH - H) // 2
+    
+    # 캔버스 중앙 기준
+    max_dx = (big_w - W) * 0.45
+    max_dy = (big_h - H) * 0.45
+    
     for f in range(n):
         t = f / max(n - 1, 1)
-        # 부드러운 가감속(smooth step)
+        # 부드러운 가감속 (Cosine Ease-in-out)
         e = 0.5 - 0.5 * math.cos(math.pi * t)
         
-        # 뚜렷한 줌(Zoom 1.0 ~ 1.16)과 확실한 카메라 틸트/패닝 이동
         if mode == 0:
-            zoom = 1.0 + 0.16 * e
-            dx = (-0.8 + 1.6 * e)
-            dy = (-0.3 + 0.6 * e)
+            # 서서히 줌인 (1.0 -> 1.12) + 우상향 이동
+            scale = 1.0 + 0.12 * e
+            cur_dx = -max_dx * (1.0 - 2.0 * e)
+            cur_dy = -max_dy * 0.5 * (1.0 - 2.0 * e)
         elif mode == 1:
-            zoom = 1.16 - 0.16 * e
-            dx = (0.8 - 1.6 * e)
-            dy = (0.3 - 0.6 * e)
+            # 서서히 줌아웃 (1.12 -> 1.0) + 좌하향 이동
+            scale = 1.12 - 0.12 * e
+            cur_dx = max_dx * (1.0 - 2.0 * e)
+            cur_dy = max_dy * 0.5 * (1.0 - 2.0 * e)
         elif mode == 2:
-            zoom = 1.04 + 0.14 * e
-            dx = 0.0
-            dy = (0.8 - 1.6 * e)
+            # 수직 상승 틸트 + 미세 줌인 (1.02 -> 1.10)
+            scale = 1.02 + 0.08 * e
+            cur_dx = 0.0
+            cur_dy = max_dy * (1.0 - 2.0 * e)
         else:
-            zoom = 1.18 - 0.14 * e
-            dx = 0.0
-            dy = (-0.8 + 1.6 * e)
-
-        # 깊이에 따른 3D 입체 변위
-        par = (depth - 0.5) * 2
-        zdepth = 1.0 / (1.0 + (zoom - 1) * (0.5 + 0.9 * depth))
-        map_x = cxb + (xx - cxb) * zdepth - dx * strength * W * par
-        map_y = cyb + (yy - cyb) * zdepth - dy * strength * H * par
-        warped = cv2.remap(src, map_x.astype(np.float32), map_y.astype(np.float32),
-                           cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
-        frame = warped[cy0:cy0 + H, cx0:cx0 + W, ::-1]
+            # 수직 하강 틸트 + 미세 줌아웃 (1.10 -> 1.02)
+            scale = 1.10 - 0.08 * e
+            cur_dx = 0.0
+            cur_dy = -max_dy * (1.0 - 2.0 * e)
+        
+        # 현재 크기
+        crop_w = int(W / scale)
+        crop_h = int(H / scale)
+        
+        # 크롭 중심점
+        cx = (big_w / 2) + cur_dx
+        cy = (big_h / 2) + cur_dy
+        
+        x1 = max(0, min(big_w - crop_w, int(cx - crop_w / 2)))
+        y1 = max(0, min(big_h - crop_h, int(cy - crop_h / 2)))
+        
+        cropped = src[y1:y1 + crop_h, x1:x1 + crop_w]
+        frame = cv2.resize(cropped, (W, H), interpolation=cv2.INTER_LINEAR)
         proc.stdin.write(np.ascontiguousarray(frame).tobytes())
+        
     proc.stdin.close(); proc.wait()
     if proc.returncode != 0:
-        raise RuntimeError("패럴랙스 인코딩 실패")
+        raise RuntimeError("카메라 무빙 인코딩 실패")
