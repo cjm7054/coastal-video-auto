@@ -126,6 +126,60 @@ def _openai(prompt: str, cfg: dict) -> bytes:
     raise RuntimeError("OpenAI 이미지 데이터 수신 실패")
 
 
+def _fetch_real_coastal_photo(query_prompt: str) -> bytes | None:
+    """위키미디어 공용(Wikimedia Commons) 등 글로벌 고화질 아카이브에서 실제 해안·방파제·테트라포드 실사 사진 검색 및 다운로드"""
+    import urllib.parse, requests
+    
+    # 핵심 검색 키워드 추출 (테트라포드, 방파제, 케이슨, 해안침식 등)
+    low = query_prompt.lower()
+    if "tetrapod" in low or "테트라포드" in query_prompt:
+        terms = ["Tetrapod concrete breakwater", "Tetrapod coastal defense", "Tetrapods breakwater waves", "Concrete tetrapod block"]
+    elif "caisson" in low or "케이슨" in query_prompt:
+        terms = ["Caisson breakwater", "Concrete caisson breakwater harbor", "Harbor caisson engineering"]
+    elif "erosion" in low or "침식" in query_prompt or "beach" in low or "모래" in query_prompt:
+        terms = ["Coastal erosion beach", "Sea cliff erosion coastal defense", "Groyne coastal protection", "Beach nourishment dredging"]
+    elif "breakwater" in low or "방파제" in query_prompt:
+        terms = ["Breakwater heavy sea waves", "Harbor breakwater concrete", "Riprap breakwater ocean"]
+    elif "wave" in low or "파도" in query_prompt or "storm" in low:
+        terms = ["Ocean storm waves crashing", "Rough sea harbor waves", "Large storm wave seawall"]
+    else:
+        terms = ["Harbor breakwater engineering", "Coastal defense concrete", "Port engineering sea"]
+
+    headers = {"User-Agent": "CoastalVideoAutoBot/1.0 (contact: admin@coastalengineering.org)"}
+    
+    for term in terms:
+        try:
+            search_url = (
+                f"https://commons.wikimedia.org/w/api.php?action=query&generator=search"
+                f"&gsrsearch={urllib.parse.quote(term)}&gsrlimit=8&prop=imageinfo"
+                f"&iiprop=url|mime|size&format=json"
+            )
+            r = requests.get(search_url, headers=headers, timeout=15)
+            if r.status_code != 200:
+                continue
+            data = r.json()
+            pages = data.get("query", {}).get("pages", {})
+            for pid, page in pages.items():
+                info_list = page.get("imageinfo", [])
+                if not info_list:
+                    continue
+                info = info_list[0]
+                mime = info.get("mime", "")
+                url = info.get("url", "")
+                # 고화질 실사 사진 (JPG/PNG 및 최소 1200px 이상)
+                if ("jpeg" in mime or "png" in mime) and url and not url.endswith(".svg") and not url.endswith(".tif"):
+                    w_img = info.get("width", 0)
+                    if w_img >= 1200 or w_img == 0:
+                        img_resp = requests.get(url, headers=headers, timeout=25)
+                        if img_resp.status_code == 200 and len(img_resp.content) > 100000:
+                            return img_resp.content
+        except Exception as e:
+            log.warning(f"실사 아카이브 검색({term}) 예외: {e}")
+            continue
+            
+    return None
+
+
 def _fit(data: bytes, w: int, h: int) -> Image.Image:
     im = Image.open(io.BytesIO(data)).convert("RGB")
     ratio = max(w / im.width, h / im.height)
@@ -212,11 +266,22 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 time.sleep(3)
 
         if not success:
-            if provider == "openai":
-                raise RuntimeError(f"OpenAI DALL-E 3 이미지 {sid} 생성 3회 실패: API 에러 로그를 확인하세요.")
-            log.warning(f"이미지 {sid} 생성 실패 → 테스트 단면도 그래픽 생성 적용")
-            _draw_fallback_image(prompt, sid, W, H).save(out, "PNG")
-            last_ok = out
+            log.info(f"이미지 {sid}: 글로벌 해안·항만 토목 실사 아카이브(Wikimedia Commons HD)에서 실제 현장 사진 다운로드 시도...")
+            real_data = _fetch_real_coastal_photo(prompt)
+            if real_data:
+                _fit(real_data, W, H).save(out, "PNG")
+                log.info(f"이미지 {sid} 실제 현장 다큐멘터리 실사 사진 반영 완료 (Wikimedia HD)")
+                last_ok = out
+                success = True
+            else:
+                # 마지막 비상 시에도 저퀄리티 파란 화면 대신 이전 성공 실사 사진 복제
+                if last_ok and last_ok.exists():
+                    import shutil
+                    shutil.copyfile(str(last_ok), str(out))
+                    log.info(f"이미지 {sid}: 이전 고화질 실사 이미지 재활용")
+                else:
+                    _draw_fallback_image(prompt, sid, W, H).save(out, "PNG")
+                last_ok = out
 
         paths.append(out)
         time.sleep(1.0)  # rate limit 여유
