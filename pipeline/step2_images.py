@@ -5,6 +5,18 @@ from PIL import Image
 from .common import load_config, ROOT, log
 
 
+def _pollinations(prompt: str, cfg: dict) -> bytes:
+    """무료 Pollinations AI (FLUX / Turbo 계열) 연동: API 키나 결제 없이 실제 이미지 생성"""
+    import urllib.parse, requests
+    w, h = cfg["images"]["width"], cfg["images"]["height"]
+    encoded = urllib.parse.quote(prompt)
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&nologo=true&seed={int(time.time()*1000)%100000}"
+    resp = requests.get(url, timeout=45)
+    if resp.status_code == 200 and resp.content:
+        return resp.content
+    raise RuntimeError(f"Pollinations 실패 (HTTP {resp.status_code})")
+
+
 def _gemini(prompt: str, cfg: dict) -> bytes:
     from google import genai
     from google.genai import types
@@ -87,7 +99,13 @@ def _draw_fallback_image(prompt: str, sid: str | int, w: int, h: int) -> Image.I
 def generate_images(script: dict, out_dir: Path) -> list[Path]:
     cfg = load_config()
     W, H = cfg["images"]["width"], cfg["images"]["height"]
-    gen = _gemini if cfg["images"]["provider"] == "gemini" else _openai
+    provider = cfg["images"].get("provider", "pollinations")
+    if provider == "gemini":
+        gen = _gemini
+    elif provider == "openai":
+        gen = _openai
+    else:
+        gen = _pollinations
     suffix = cfg["images"]["style_suffix"].strip()
     paths, last_ok = [], None
     jobs = [("thumb", script["thumbnail_prompt"])] + [(s["id"], s["image_prompt"]) for s in script["scenes"]]
@@ -100,16 +118,27 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
         for attempt in range(3):
             try:
                 _fit(gen(prompt, cfg), W, H).save(out, "PNG")
-                log.info(f"이미지 {sid} 완료 (API)")
+                log.info(f"이미지 {sid} 완료 ({provider})")
                 last_ok = out
                 success = True
                 break
             except Exception as e:
                 log.warning(f"이미지 {sid} 실패({attempt+1}/3): {e}")
+                # 만약 유료 API 실패 시 무료 Pollinations로 자동 우회
+                if provider != "pollinations":
+                    try:
+                        log.info(f"이미지 {sid} → 무료 Pollinations AI로 우회 생성 시도")
+                        _fit(_pollinations(prompt, cfg), W, H).save(out, "PNG")
+                        log.info(f"이미지 {sid} 무료 AI 생성 완료")
+                        last_ok = out
+                        success = True
+                        break
+                    except Exception as pe:
+                        log.warning(f"Pollinations 우회 실패: {pe}")
                 time.sleep(3)
 
         if not success:
-            log.warning(f"이미지 {sid} API 실패/크레딧 부족 → 테스트 단면도 그래픽 생성 적용")
+            log.warning(f"이미지 {sid} 생성 실패 → 테스트 단면도 그래픽 생성 적용")
             _draw_fallback_image(prompt, sid, W, H).save(out, "PNG")
             last_ok = out
 

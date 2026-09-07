@@ -18,7 +18,7 @@ script:
     첫 15초 안에 궁금증(훅)을 던지고, 마지막에 다음 영상 예고로 마무리.
 
 images:
-  provider: "gemini"                 # gemini | openai
+  provider: "pollinations"           # pollinations(100% 무료) | gemini | openai
   gemini_model: "gemini-3.1-flash-image-preview"
   openai_model: "dall-e-3"
   width: 1920
