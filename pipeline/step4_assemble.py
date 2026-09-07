@@ -95,8 +95,9 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
     # FFmpeg libass 자막 필터:
     # 윈도우/리눅스 공통으로 subtitles=subs.srt (따옴표 없음) 형태로 넘겨야
     # libass가 따옴표 자체를 파일 이름으로 해석하지 않고 정상 로드합니다.
+    # 신비한 건축사전식 자막 스타일: 가독성 극대화된 굵은 노란색/흰색 폰트, 진한 검은 외곽선
     style = (f"FontName=Noto Sans CJK KR,FontSize={cfg['video']['subtitle_size']//2},Bold=1,"
-             f"PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=60")
+             f"PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=4,Shadow=2,Alignment=2,MarginV=65")
     sub = f"subtitles=subs.srt:fontsdir=.:force_style='{style}'"
 
     inputs = ["-i", "joined.mp4"]
