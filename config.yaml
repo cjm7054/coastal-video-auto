@@ -40,13 +40,14 @@ tts:
 video_gen:                           # 핵심 장면 AI 동영상 (Google Flow / Veo 3.1)
   enabled: true
   model: "veo-3.1-generate-preview"
-  max_scenes: 4                      # 핵심 클라이맥스 4개 장면 Google Veo 3.1 AI 동영상 생성
+  max_scenes: 8                      # 핵심 장면 8개 Google Veo 3.1 AI 동영상 생성 (진짜 모션 영상 비율 확대)
   seconds: 8
   resolution: "1080p"
   slow_factor: 0.8                   # 클립 재생 속도(0.8 = 20% 느리게 → 10초)
   style_suffix: >
-    slow cinematic camera movement, realistic physics, ocean water and particles moving naturally,
-    heavy engineering site, documentary cinematography, no text, no CGI cartoon, no distorted structures
+    cinematic camera motion, dynamic fluid ocean waves, slow drone push-in, heavy civil engineering,
+    realistic water physics, 4k ultra documentary footage, industrial machinery in active operation,
+    no text, no watermark, no CGI cartoon, no distorted structures
 
 video:
   fps: 24
