@@ -60,8 +60,8 @@ def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
     img = Image.open(img_path).convert("RGB")
     W, H = img.size
     
-    # 여유 있는 캔버스 확장 (부드러운 카메라 패닝용)
-    pad = 1.15
+    # 역동적인 고배율 캔버스 확장 (광각 패닝 및 강력한 줌인/줌아웃 무빙용)
+    pad = 1.38
     big_w, big_h = int(W * pad), int(H * pad)
     big = img.resize((big_w, big_h), Image.LANCZOS)
     src = np.array(big)[:, :, ::-1]  # BGR for cv2
@@ -71,35 +71,36 @@ def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
            "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", str(out)]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
     
-    # 캔버스 중앙 기준
-    max_dx = (big_w - W) * 0.45
-    max_dy = (big_h - H) * 0.45
+    # 캔버스 패닝 이동 최대폭
+    max_dx = (big_w - W) * 0.48
+    max_dy = (big_h - H) * 0.48
     
     for f in range(n):
         t = f / max(n - 1, 1)
-        # 부드러운 가감속 (Cosine Ease-in-out)
-        e = 0.5 - 0.5 * math.cos(math.pi * t)
+        # 단 한 순간도 정지하지 않는 지속 이동 커브 (선형 등속도 60% + 부드러운 가속도 40% 결합)
+        # 코사인 커브만 쓰면 시작과 끝점(t=0, t=1) 미분값이 0이 되어 순간 멈춤 느낌이 나므로, 선형 t를 결합해 항상 초당 일정 픽셀 이상 지속 이동 보장!
+        v = 0.6 * t + 0.4 * (0.5 - 0.5 * math.cos(math.pi * t))
         
         if mode == 0:
-            # 서서히 줌인 (1.0 -> 1.12) + 우상향 이동
-            scale = 1.0 + 0.12 * e
-            cur_dx = -max_dx * (1.0 - 2.0 * e)
-            cur_dy = -max_dy * 0.5 * (1.0 - 2.0 * e)
+            # 1. 광각 돌리 줌인 (1.0 -> 1.34) + 좌하단에서 우상단으로 속도감 있는 전진 패닝
+            scale = 1.0 + 0.34 * v
+            cur_dx = -max_dx * (1.0 - 2.0 * t)
+            cur_dy = -max_dy * 0.6 * (1.0 - 2.0 * t)
         elif mode == 1:
-            # 서서히 줌아웃 (1.12 -> 1.0) + 좌하향 이동
-            scale = 1.12 - 0.12 * e
-            cur_dx = max_dx * (1.0 - 2.0 * e)
-            cur_dy = max_dy * 0.5 * (1.0 - 2.0 * e)
+            # 2. 광각 돌리 줌아웃 (1.35 -> 1.02) + 우측에서 좌측으로 역동적 수평 트래킹
+            scale = 1.35 - 0.33 * v
+            cur_dx = max_dx * (1.0 - 2.0 * t)
+            cur_dy = max_dy * 0.35 * (1.0 - 2.0 * t)
         elif mode == 2:
-            # 수직 상승 틸트 + 미세 줌인 (1.02 -> 1.10)
-            scale = 1.02 + 0.08 * e
-            cur_dx = 0.0
-            cur_dy = max_dy * (1.0 - 2.0 * e)
+            # 3. 웅장한 크레인 수직 상승 (Tilt-Up) + 집중 줌인 (1.04 -> 1.30)
+            scale = 1.04 + 0.26 * v
+            cur_dx = max_dx * 0.4 * (1.0 - 2.0 * t)
+            cur_dy = max_dy * (1.0 - 2.0 * t)
         else:
-            # 수직 하강 틸트 + 미세 줌아웃 (1.10 -> 1.02)
-            scale = 1.10 - 0.08 * e
-            cur_dx = 0.0
-            cur_dy = -max_dy * (1.0 - 2.0 * e)
+            # 4. 하강 헬리캠 샷 (Tilt-Down) + 대각선 오비탈 패닝 (1.32 -> 1.05)
+            scale = 1.32 - 0.27 * v
+            cur_dx = -max_dx * 0.45 * (1.0 - 2.0 * t)
+            cur_dy = -max_dy * (1.0 - 2.0 * t)
         
         # 현재 크기
         crop_w = int(W / scale)

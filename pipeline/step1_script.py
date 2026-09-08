@@ -56,13 +56,13 @@ PROMPT = """당신은 유튜브 100만 조회수를 기록하는 공학 전문 �
   4) [구조 비교 인포그래픽 (REFLECTION VS ABSORPTION)]: 수직 직립벽(파도를 튕겨냄)과 경사 사석 방파제(파도를 흡수함)의 물리적 차이를 3D 컷어웨이로 대조.
 
 - 모든 "image_prompt"는 아래 요소를 필수로 조합하여 작성하세요:
-  * "Photorealistic 3D architectural cross-section cutaway rendering, detailed civil engineering diorama on clean dark gradient studio background"
-  * "Submerged underwater foundation cross-section showing gravel bed, seabed layers, and internal reinforced concrete compartments"
+  * "Photorealistic 3D cinematic aerial ocean perspective, detailed coastal maritime engineering in expansive natural shoreline landscape"
+  * "Submerged underwater foundation view showing gravel bedding, natural seabed contours, and reinforced concrete structure seamlessly integrated with ocean environment"
   * "Subtle red dimension measurement lines, glowing scientific callout arrows, technical HUD overlay"
-  * "Octane Render, Cinema 4D, hyper-detailed 8k, dramatic studio lighting, ray-traced water transparency"
+  * "Octane Render, Cinema 4D, hyper-detailed 8k, natural daylight and atmospheric ocean spray, ray-traced water transparency"
 
 - "motion_prompt" (Veo 3.1 비디오 지시어):
-  * "Smooth cinematic 3D orbital camera panning around the massive cross-section structure, realistic fluid dynamic waves crashing, slow-motion water spray, mechanical cutaway animation"
+  * "Continuous smooth dynamic cinematic 3D orbital camera flight around massive coastal engineering structure, realistic fluid dynamic waves crashing, slow-motion water spray, active coastal atmosphere"
 
 [나레이션 딕션]:
 - 공식 채널명: OCEAN CODE LAB (OCL)

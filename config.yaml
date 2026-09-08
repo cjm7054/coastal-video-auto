@@ -24,17 +24,17 @@ images:
   openai_model: "dall-e-3"
   width: 1920
   height: 1080
-  # 모든 이미지에 공통 적용되는 스타일 (신비한 건축사전식 3D 디오라마 단면 투시도 엔지니어링 렌더링)
+  # 모든 이미지에 공통 적용되는 스타일 (자연스럽게 이어지는 해안선 및 바다 3D 토목공학 조감도 엔지니어링 렌더링)
   style_suffix: >
-    photorealistic 3D architectural cross-section cutaway rendering, detailed civil engineering diorama,
-    Octane Render, Cinema 4D, V-Ray, hyper-detailed 8k, dramatic dark gradient studio background,
-    subtle red architectural measurement lines and callout arrows, transparent water cutaway showing submerged foundation,
+    photorealistic 3D cinematic aerial ocean perspective of maritime civil engineering, natural curved coastline,
+    seamlessly integrated shoreline terrain, realistic ocean wave physics, Octane Render, Cinema 4D, V-Ray,
+    hyper-detailed 8k, subtle red architectural measurement lines and callout arrows, transparent water showing submerged foundation,
     crisp textures, sharp focus, technical architectural visualization, no cartoon, 16:9
 
 tts:
   provider: "edge"                   # edge(무료) | elevenlabs(유료, 고품질)
-  edge_voice: "ko-KR-SunHiNeural"   # 차분하고 지적인 여성 아나운서 톤 (SunHi)
-  rate: "-2%"                        # 살짝 차분하고 안정감 있는 낭독 속도 (-2%)
+  edge_voice: "ko-KR-InJoonNeural"   # 신뢰감 있고 귀에 쏙쏙 박히는 남성 다큐멘터리 해설 톤 (InJoon)
+  rate: "+6%"                        # 유튜브 다큐에 최적화된 빠르고 몰입감 넘치는 템포 (+6%)
   elevenlabs_voice_id: ""
   elevenlabs_model: "eleven_multilingual_v2"
 
@@ -46,9 +46,9 @@ video_gen:                           # 핵심 장면 AI 동영상 (Google Veo 3.
   resolution: "1080p"
   slow_factor: 0.8                   # 클립 재생 속도(0.8 = 20% 느리게 → 10초)
   style_suffix: >
-    smooth cinematic orbital camera pan around photorealistic 3D architectural cutaway structure,
-    realistic fluid dynamic water simulation, slow-motion wave action, 4k civil engineering diorama,
-    raytraced reflections, high-end technical animation, no cartoon, no watermark, no text
+    smooth cinematic orbital camera pan around photorealistic 3D maritime engineering structure,
+    integrated natural shoreline landscape, realistic fluid dynamic ocean water simulation, slow-motion wave action,
+    hyper-detailed 4k civil engineering visualization, raytraced water reflections, high-end technical animation, no cartoon, no watermark, no text
 
 video:
   fps: 24
