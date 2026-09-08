@@ -16,43 +16,41 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
     clean_prompt = prompt[:900]
     client = genai.Client(api_key=api_key)
 
-    # 1. Imagen 공식 models.generate_images (가장 실사 및 토목 렌더링에 적합)
+    # 1. Imagen 공식 models.generate_images
+    # Google Cloud 프로젝트(Tier 1 결제) 연결 시 vertexai=True 모드로 전환 시도
     imagen_models = [
         "imagen-3.0-generate-002",
         "imagen-4.0-generate-001",
     ]
     for m in imagen_models:
-        try:
-            log.info(f"Google Imagen({m}) 이미지 생성 시도: {clean_prompt[:60]}...")
-            resp = client.models.generate_images(
-                model=m,
-                prompt=clean_prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    aspect_ratio="16:9",
-                    person_generation="ALLOW_ADULT",
-                    output_mime_type="image/jpeg",
+        for use_vx in [False, True]:
+            try:
+                log.info(f"Google Imagen({m}, vertexai={use_vx}) 이미지 생성 시도: {clean_prompt[:60]}...")
+                c = genai.Client(api_key=api_key, vertexai=use_vx, project="coastal-video-auto") if use_vx else client
+                resp = c.models.generate_images(
+                    model=m,
+                    prompt=clean_prompt,
+                    config=types.GenerateImagesConfig(
+                        number_of_images=1,
+                        output_mime_type="image/jpeg",
+                    ),
                 )
-            )
-            if resp and resp.generated_images:
-                img_wrapper = resp.generated_images[0]
-                # types.Image 객체 처리
-                img_obj = getattr(img_wrapper, "image", img_wrapper)
-                # 1) image_bytes
-                raw = getattr(img_obj, "image_bytes", None) or getattr(img_obj, "_image_bytes", None)
-                if raw:
-                    return base64.b64decode(raw) if isinstance(raw, str) else raw
-                # 2) PIL Image 호환 또는 save 메서드
-                if hasattr(img_obj, "save"):
-                    buf = io.BytesIO()
-                    img_obj.save(buf, format="JPEG")
-                    return buf.getvalue()
-                if hasattr(img_obj, "as_pil"):
-                    buf = io.BytesIO()
-                    img_obj.as_pil().save(buf, format="JPEG")
-                    return buf.getvalue()
-        except Exception as err:
-            log.warning(f"Google Imagen({m}) 시도 실패: {err}")
+                if resp and resp.generated_images:
+                    img_wrapper = resp.generated_images[0]
+                    img_obj = getattr(img_wrapper, "image", img_wrapper)
+                    raw = getattr(img_obj, "image_bytes", None) or getattr(img_obj, "_image_bytes", None)
+                    if raw:
+                        return base64.b64decode(raw) if isinstance(raw, str) else raw
+                    if hasattr(img_obj, "save"):
+                        buf = io.BytesIO()
+                        img_obj.save(buf, format="JPEG")
+                        return buf.getvalue()
+                    if hasattr(img_obj, "as_pil"):
+                        buf = io.BytesIO()
+                        img_obj.as_pil().save(buf, format="JPEG")
+                        return buf.getvalue()
+            except Exception as err:
+                log.warning(f"Google Imagen({m}, vertexai={use_vx}) 시도 실패: {err}")
 
     # 2. Gemini 멀티모달 generate_content (IMAGE 출력 모달리티)
     multimodal_models = ["gemini-3.1-flash-image", "gemini-2.5-flash-image", "gemini-2.0-flash"]
@@ -149,20 +147,23 @@ def _openai(prompt: str, cfg: dict) -> bytes:
             if resp.status_code == 200:
                 return resp.content
     except Exception as e3:
-        log.warning(f"dall-e-3 시도 실패({e3}) → dall-e-2로 재시도")
+        log.warning(f"dall-e-3 시도 실패({e3})")
         # 2. DALL-E 2 시도 (1024x1024)
-        r = client.images.generate(
-            model="dall-e-2",
-            prompt=clean_prompt[:400],
-            size="1024x1024",
-        )
-        item = r.data[0]
-        if getattr(item, "b64_json", None):
-            return base64.b64decode(item.b64_json)
-        if getattr(item, "url", None):
-            resp = requests.get(item.url, timeout=60)
-            if resp.status_code == 200:
-                return resp.content
+        try:
+            r = client.images.generate(
+                model="dall-e-2",
+                prompt=clean_prompt[:400],
+                size="1024x1024",
+            )
+            item = r.data[0]
+            if getattr(item, "b64_json", None):
+                return base64.b64decode(item.b64_json)
+            if getattr(item, "url", None):
+                resp = requests.get(item.url, timeout=60)
+                if resp.status_code == 200:
+                    return resp.content
+        except Exception as e2:
+            log.warning(f"dall-e-2 시도 실패({e2})")
                 
     raise RuntimeError("OpenAI 이미지 데이터 수신 실패")
 
@@ -382,15 +383,31 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 except Exception as ge2:
                     log.warning(f"이미지 {sid} {gen_name} 재시도 실패: {ge2}")
 
-        # 3차: 앞선 장면 이미지가 있다면 시각적 일관성을 위해 직전 장면 재사용
+        # 3차: AI 생성 실패 시 고화질 해양 토목 실사 사진 아카이브에서 문맥에 맞는 사진 검색
+        if not success:
+            log.info(f"이미지 {sid}: 고화질 컬러 실사 사진 아카이브 매칭 시도...")
+            real_photo = _fetch_real_coastal_photo(context_text, used_archive_urls)
+            if real_photo:
+                try:
+                    _fit(real_photo, W, H).save(out, "PNG")
+                    log.info(f"이미지 {sid} 실사 사진 매칭 저장 완료")
+                    success = True
+                except Exception as rpe:
+                    log.warning(f"실사 사진 가공 실패: {rpe}")
+
+        # 4차: 앞선 장면 이미지가 있다면 시각적 일관성을 위해 직전 장면 재사용
         if not success:
             prev_imgs = [p for p in paths if p.name != "thumb.png" and p.exists()]
             if prev_imgs:
                 log.warning(f"이미지 {sid}: AI 모델 일시 제한으로 직전 고화질 장면({prev_imgs[-1].name}) 연속 연결")
                 shutil.copy(prev_imgs[-1], out)
                 success = True
-            else:
-                raise RuntimeError(f"이미지 {sid} 생성 전체 실패: Google Imagen/Gemini 및 OpenAI 생성이 모두 실패했습니다. API 키 권한이나 할당량을 확인하세요.")
+
+        # 5차: 썸네일이거나 첫 장면인 경우에도 절대 다운되지 않도록 긴급 시네마틱 비주얼 생성
+        if not success:
+            log.warning(f"이미지 {sid}: 최후의 비상 시네마틱 해양 배경 생성")
+            _draw_emergency_coastal_visual(prompt, sid, W, H).save(out, "PNG")
+            success = True
 
         paths.append(out)
         time.sleep(1.0)
