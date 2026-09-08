@@ -56,12 +56,12 @@ def build_scene(i: int, sc: dict, out_dir: Path, tmp: Path, motion_clips: dict, 
         else:
             last = tmp / f"{sid}_last.png"; _last_frame(clip, last)
             tail = tmp / f"{sid}_tail.mp4"
-            render_parallax(last, dur - cd, tail, fps=fps, mode=i % 4, strength=strength)
+            render_parallax(last, dur - cd, tail, fps=fps, mode=i % 6, strength=strength)
             _concat([clip, tail], silent)
         log.info(f"장면 {sid}: Veo {cd:.1f}s + 패럴랙스 {max(dur-cd,0):.1f}s")
     else:
-        render_parallax(img, dur, silent, fps=fps, mode=i % 4, strength=strength)
-        log.info(f"장면 {sid}: 패럴랙스 {dur:.1f}s")
+        render_parallax(img, dur, silent, fps=fps, mode=i % 6, strength=strength)
+        log.info(f"장면 {sid}: 3D 시네마틱 무빙 {dur:.1f}s (모드 {i % 6})")
     final = tmp / f"{sid}.mp4"
     _mux_audio(silent, Path(sc["mp3"]), dur, final)
     return final
