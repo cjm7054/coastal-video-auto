@@ -32,12 +32,33 @@ def generate_motion_clips(script: dict, out_dir: Path) -> dict:
         img = types.Image.from_file(location=str(img_path))
         prompt = f"{sc.get('motion_prompt') or sc['image_prompt']}. {vcfg['style_suffix'].strip()}"
         try:
-            op = client.models.generate_videos(
-                model=vcfg["model"], prompt=prompt, image=img,
-                config=types.GenerateVideosConfig(
-                    aspect_ratio="16:9", resolution=vcfg["resolution"],
-                    duration_seconds=str(vcfg["seconds"]), person_generation="allow_adult"),
-            )
+            log.info(f"Veo 모델({vcfg['model']}) 영상 생성 호출 시도: {prompt[:80]}...")
+            # 1. source 객체 전달 방식 시도
+            try:
+                op = client.models.generate_videos(
+                    model=vcfg["model"],
+                    source=types.GenerateVideosSource(
+                        prompt=prompt,
+                        image=img,
+                    ),
+                    config=types.GenerateVideosConfig(
+                        number_of_videos=1,
+                        aspect_ratio="16:9",
+                        duration_seconds=vcfg.get("seconds", 5),
+                        enhance_prompt=True,
+                    ),
+                )
+            except Exception as src_err:
+                log.info(f"GenerateVideosSource 방식 예외({src_err}) → 직접 인자 전달 시도...")
+                op = client.models.generate_videos(
+                    model=vcfg["model"],
+                    prompt=prompt,
+                    image=img,
+                    config=types.GenerateVideosConfig(
+                        aspect_ratio="16:9",
+                        duration_seconds=vcfg.get("seconds", 5),
+                    ),
+                )
             waited = 0
             while not op.done:
                 time.sleep(10); waited += 10
