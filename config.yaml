@@ -23,12 +23,12 @@ images:
   openai_model: "dall-e-3"
   width: 1920
   height: 1080
-  # 모든 이미지에 공통 적용되는 스타일 (실사 항만·해안 토목 엔지니어링 다큐멘터리 스타일)
+  # 모든 이미지에 공통 적용되는 스타일 (신비한 건축사전식 3D 디오라마 단면 투시도 엔지니어링 렌더링)
   style_suffix: >
-    National Geographic documentary photograph, award winning civil engineering photography,
-    Sony A7R IV 35mm lens, raw realistic industrial lighting, authentic maritime civil engineering,
-    hyper-realistic 8k, sharp detailed textures, no fantasy, no futuristic elements, no cartoon,
-    no distorted ships, no strange structures, no text, 16:9
+    photorealistic 3D architectural cross-section cutaway rendering, detailed civil engineering diorama,
+    Octane Render, Cinema 4D, V-Ray, hyper-detailed 8k, dramatic dark gradient studio background,
+    subtle red architectural measurement lines, transparent water cutaway showing submerged foundation,
+    crisp textures, sharp focus, technical architectural visualization, no cartoon, 16:9
 
 tts:
   provider: "edge"                   # edge(무료) | elevenlabs(유료, 고품질)
@@ -45,9 +45,9 @@ video_gen:                           # 핵심 장면 AI 동영상 (Google Flow /
   resolution: "1080p"
   slow_factor: 0.8                   # 클립 재생 속도(0.8 = 20% 느리게 → 10초)
   style_suffix: >
-    cinematic camera motion, dynamic fluid ocean waves, slow drone push-in, heavy civil engineering,
-    realistic water physics, 4k ultra documentary footage, industrial machinery in active operation,
-    no text, no watermark, no CGI cartoon, no distorted structures
+    smooth cinematic orbital camera pan around photorealistic 3D architectural cutaway structure,
+    realistic fluid dynamic water simulation, slow-motion wave action, 4k civil engineering diorama,
+    raytraced reflections, high-end technical animation, no cartoon, no watermark, no text
 
 video:
   fps: 24

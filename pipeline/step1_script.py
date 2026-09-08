@@ -4,8 +4,8 @@ from pathlib import Path
 import anthropic
 from .common import load_config, save_json, log
 
-PROMPT = """당신은 유튜브 인기 공학 정보 채널 "{channel}"의 전문 기획자 겸 대본 작가입니다.
-유튜브 채널 '신비한 건축사전' 특유의 흡입력 넘치는 시그니처 연출 기법을 '해안·항만·바다 토목 공학'에 완벽히 접목하여 대본을 작성하세요.
+PROMPT = """당신은 유튜브 100만 조회수를 기록하는 공학 전문 채널 '신비한 건축사전'의 메인 총괄 디렉터 겸 수석 대본 작가입니다.
+시청자를 단 1초 만에 사로잡는 '신비한 건축사전'(@신비한_건축사전_1) 고유의 치밀한 연출 공식과 3D 건축 디오라마 시각 스타일을 해안·항만·바다 토목공학 다큐멘터리에 완벽하게 이식하여 대본을 작성하세요.
 
 {persona}
 
@@ -16,42 +16,48 @@ PROMPT = """당신은 유튜브 인기 공학 정보 채널 "{channel}"의 전�
 {{
   "title": "유튜브 제목 (강렬한 호기심 유발, '왜 OO는 XX할까?', 구체적 숫자 포함)",
   "thumbnail_text": "썸네일용 굵고 짧은 핵심 텍스트 2줄 (줄바꿈 \\n, '수심 50m 비밀\\n테트라포드의 진실')",
-  "thumbnail_prompt": "썸네일용 초고화질 실사 이미지 프롬프트 (영어, 극적인 앵글)",
+  "thumbnail_prompt": "썸네일용 3D 디오라마 단면 투시도 렌더링 프롬프트 (영어, 극적인 단면 컷어웨이와 붉은 치수선)",
   "description": "영상 설명란 텍스트 (호기심 유발 문장 + 공학적 팩트 요약 + 해시태그 5개)",
   "tags": ["항만", "해안공학", "토목공학", "테트라포드", "방파제", "바다"],
   "scenes": [
     {{
       "id": 1,
-      "narration": "장면 나레이션. 구어체 존댓말, 명확한 단문 위주, 귀에 쏙쏙 박히는 아나운서 브리핑 톤.",
-      "image_prompt": "이 장면의 영문 이미지 프롬프트. 반드시 실제 항만/해양 공학 현장의 실사 사진 묘사 (예: Authentic documentary photograph of a real trailing suction hopper dredger ship deepening a harbor basin, heavy industrial equipment, realistic water physics, no sci-fi, no fantasy, no distorted vessels)",
-      "motion": false,
-      "motion_prompt": ""
+      "narration": "장면 나레이션.",
+      "image_prompt": "이 장면의 영문 3D 건축/토목 디오라마 렌더링 프롬프트.",
+      "motion": true,
+      "motion_prompt": "카메라 궤적 및 물리적 시뮬레이션 영문 프롬프트"
     }}
   ]
 }}
 
-[신비한 건축사전식 시각 연출 및 이미지/영상 프롬프트 절대 규칙]:
-- 모든 장면은 '신비한 건축사전' 방송에 나오는 것과 같은 최고급 공학 비주얼이어야 합니다.
-- 정적인 평면 사진이 아닌, 아래 3대 시그니처 비주얼 유형을 골고루 배치하세요:
-  1) [3D 입체 투시도 및 단면도 (3D Isometric Cross-Section)]: 구조물의 내부 작동 원리나 해저 속 기초 지반을 보여주는 정밀 3D 컷어웨이 다이어그램 (예: "Detailed 3D architectural cross-section cutaway rendering of a massive concrete caisson resting on a gravel seabed, showing internal sand compartments, underwater ballast mechanics, photorealistic raytraced octane render, 8k civil engineering visualization")
-  2) [시네마틱 드론 FPV 및 헬리캠 샷 (Cinematic Drone FPV)]: 거대한 규모감을 전달하는 다이내믹 항공 앵글 (예: "Epic cinematic low-altitude FPV drone shot flying towards a massive ocean breakwater being battered by violent 15-meter stormy waves, misty spray, dramatic volumetric lighting, National Geographic documentary 8k")
-  3) [초근접 산업 매크로 및 중장비 액션 (Heavy Engineering Action)]: 크레인, 준설선 펌프, 케이슨 침설 등 실제 현장의 박진감 넘치는 액션 (예: "Close-up action photograph of a massive floating crane barge lowering a 2,000-ton concrete block into churning ocean water, heavy steel cables, tension, foaming sea foam, ultra-realistic documentary")
+[★ 신비한 건축사전 완벽 복제: 4단계 스토리텔링 & 시그니처 대사 규칙]:
+- 총 장면 수: 정확히 {n_scenes}개 (모든 장면에 "motion": true 및 "motion_prompt" 필수)
+- 1단계: 도입 (Hook, 장면 1~2)
+  * 반드시 시그니처 멘트 "여기 [구조물 이름]가 있습니다."로 포문을 엽니다.
+  * 일상에서 흔히 보지만 아무도 몰랐던 기괴한 형태나 크기에 날카로운 질문을 던집니다.
+- 2단계: 난관 (Conflict & Crisis, 장면 3~5)
+  * 자연의 가혹함과 기존 방식의 한계를 극적으로 부각합니다. (수십 톤의 파도 충격력, 태풍, 연약 지반 침하 등)
+  * 난관의 정점에서 반드시 시그니처 멘트: "아주 환장할 노릇이죠." 또는 "순식간에 산산조각 나기 십상입니다."를 사용합니다.
+- 3단계: 해결 (Resolution & Engineering, 장면 6~15)
+  * 공학자들의 기발한 역발상과 해결책 제시. 반드시 시그니처 멘트: "비상한 [공학/아이디어]가 등장합니다.", "발상을 완전히 뒤집은 겁니다."를 투입합니다.
+  * 3D 단면 컷어웨이와 수치(높이, 무게, 각도, 압력 분산 등)를 통해 공학적 메커니즘을 시각적·논리적으로 쾌도난마처럼 풀어냅니다.
+- 4단계: 요약 및 클로징 (Summary & Outro, 장면 16~18)
+  * "결국 [구조물/기술]은 이렇게 탄생한 겁니다."라는 확정 클로징으로 매듭을 짓고, 3줄 핵심 요약과 감탄을 남깁니다.
 
-- "motion": true 설정 (모든 장면 필수):
-  - 모든 장면에 "motion": true를 부여하고, 각 장면의 동적 연출을 위한 "motion_prompt"를 영문으로 구체적으로 작성하세요.
-  - "motion_prompt"에는 파도의 유체 역학 흐름, 초저고도 FPV 드론 질주, 3D 단면 투시 회전, 크레인의 해상 블록 침설 하강 등 명확하고 생생한 카메라·물체 모션을 영어로 지시하세요. (예: "Dynamic cinematic drone shot flying fast over violent 10-meter ocean waves crashing against concrete tetrapods, realistic water spray and physics, heavy industrial maritime port")
+[★ 신비한 건축사전 고유의 3D 건축 렌더링 시각 프롬프트 규칙]:
+- 단순한 흐릿한 풍경 사진이 절대 아닙니다. 마이크로소프트/구글/넷플릭스 다큐멘터리 수준의 **'3D 입체 디오라마 단면 투시도(Isometric Cutaway Diorama)'**를 구사해야 합니다.
+- 모든 "image_prompt"는 아래 요소들을 필수로 포함하여 정밀하게 작성하세요:
+  * "Photorealistic 3D architectural cross-section cutaway rendering"
+  * "Detailed engineering diorama on clean dark gradient studio background"
+  * "Submerged underwater foundation cross-section showing gravel bed, seabed layers, and internal reinforced concrete compartments"
+  * "Subtle red dimension measurement lines, callout arrows, technical architectural layout"
+  * "Octane Render, Cinema 4D, V-Ray hyper-detailed 8k, dramatic studio lighting, ray-traced water transparency"
+- "motion_prompt" (Veo 3.1 비디오 지시어):
+  * "Smooth cinematic 3D orbital camera panning around the massive cross-section structure, realistic fluid dynamic waves crashing, slow-motion water spray, mechanical cutaway animation"
 
-[신비한 건축사전식 필수 4단계 스토리텔링 구조]:
-- 총 장면 수: 정확히 {n_scenes}개 (모든 {n_scenes}개 장면에 "motion": true 및 고유한 "motion_prompt" 필수 작성)
-- 1단계 [도입·훅 (장면 1)]: "바닷가에서 무심코 지나치는 테트라포드, 그런데 이 거대한 덩어리가 왜 4개의 다리를 가졌는지 알고 계셨나요?" 같은 일상적 시선에서의 강렬한 호기심 유발.
-- 2단계 [위기·난관 (장면 2~4)]: 바다의 가혹한 물리적 한계 제시. "만약 일반 사각 콘크리트 벽을 세운다면 20미터 폭풍 파도의 충격력(수십 톤)을 정면으로 맞아 순식간에 박살 납니다."
-- 3단계 [공학적 해결 (장면 5~15)]: 해안 토목공학의 놀라운 지혜와 수치. "파도를 막는 게 아니라, 틈새로 파도를 통과시켜 스스로 에너지를 상쇄시키는 4차원 인터로킹(맞물림) 메커니즘"을 비유와 핵심 수치로 명쾌하게 해설. (3D 투시도 및 단면도를 집중 배치)
-- 4단계 [요약·여운 (장면 16~18)]: 감탄을 자아내는 공학적 가치 정리 + 다음 편 예고 + 구독/좋아요 클로징.
-
-[나레이션 톤앤매너]:
-- 총 낭독 시간: 약 {target_minutes}분 ({total_chars}자 내외).
-- 군더더기 없는 명확한 단문, 지적이면서도 귀에 쏙쏙 박히는 몰입감 높은 딕션.
-- 전문 용어는 반드시 직관적인 일상 비유와 함께 설명.
+[나레이션 딕션]:
+- 군더더기 없는 단문 위주의 빠른 템포, 귀에 쏙쏙 박히는 아나운서 해설 톤.
+- 총 {target_minutes}분 분량 ({total_chars}자 내외).
 """
 
 
