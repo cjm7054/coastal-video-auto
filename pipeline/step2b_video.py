@@ -37,10 +37,17 @@ def generate_motion_clips(script: dict, out_dir: Path) -> dict:
                 if waited > 600:
                     raise TimeoutError("Veo 생성 10분 초과")
             vid = op.response.generated_videos[0]
-            client.files.download(file=vid.video)
-            vid.video.save(str(out))
+            try:
+                client.files.download(file=vid.video, destination=str(out))
+            except Exception:
+                if getattr(vid.video, "video_bytes", None):
+                    out.write_bytes(vid.video.video_bytes)
+                elif hasattr(vid.video, "save"):
+                    vid.video.save(str(out))
+                else:
+                    raise
             result[sc["id"]] = out
-            log.info(f"Veo 클립 {sc['id']} 완료")
+            log.info(f"Veo 클립 {sc['id']} 생성 및 저장 완료")
         except Exception as e:
             log.error(f"Veo 클립 {sc['id']} 실패 → 패럴랙스로 대체: {e}")
     return result
