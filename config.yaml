@@ -37,16 +37,16 @@ tts:
   elevenlabs_voice_id: ""
   elevenlabs_model: "eleven_multilingual_v2"
 
-video_gen:                           # 핵심 장면 AI 동영상 (무료 테스트 시 비활성화)
-  enabled: false
-  model: "veo-3.1-lite-generate-preview"
-  max_scenes: 0                      # 패럴랙스 2.5D 카메라 무빙으로 대체 (100% 무료)
+video_gen:                           # 핵심 장면 AI 동영상 (Google Flow / Veo 3.1)
+  enabled: true
+  model: "veo-3.1-generate-preview"
+  max_scenes: 2                      # 시각적 몰입감이 가장 큰 핵심 클라이맥스 2개 장면 AI 동영상 생성
   seconds: 8
   resolution: "1080p"
   slow_factor: 0.8                   # 클립 재생 속도(0.8 = 20% 느리게 → 10초)
   style_suffix: >
-    slow cinematic camera movement, realistic physics, water and particles moving naturally,
-    no text, no people, engineering visualization
+    slow cinematic camera movement, realistic physics, ocean water and particles moving naturally,
+    heavy engineering site, documentary cinematography, no text, no CGI cartoon, no distorted structures
 
 video:
   fps: 24

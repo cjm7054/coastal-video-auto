@@ -15,13 +15,21 @@ def generate_motion_clips(script: dict, out_dir: Path) -> dict:
     from google.genai import types
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     (out_dir / "videos").mkdir(exist_ok=True)
-    targets = [s for s in script["scenes"] if s.get("motion")][: vcfg["max_scenes"]]
+    # motion이 명시된 장면 우선, 없으면 시각적 설명이 풍부한 전반부/중반부 장면 선택
+    targets = [s for s in script["scenes"] if s.get("motion")]
+    if len(targets) < vcfg["max_scenes"]:
+        remaining = [s for s in script["scenes"] if s not in targets]
+        targets += remaining[: vcfg["max_scenes"] - len(targets)]
+    targets = targets[: vcfg["max_scenes"]]
     result = {}
     for sc in targets:
         out = out_dir / "videos" / f"{sc['id']}.mp4"
         if out.exists():
             result[sc["id"]] = out; continue
-        img = types.Image.from_file(location=str(out_dir / "images" / f"{sc['id']}.png"))
+        img_path = out_dir / "images" / f"{sc['id']}.png"
+        if not img_path.exists():
+            continue
+        img = types.Image.from_file(location=str(img_path))
         prompt = f"{sc.get('motion_prompt') or sc['image_prompt']}. {vcfg['style_suffix'].strip()}"
         try:
             op = client.models.generate_videos(
