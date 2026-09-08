@@ -6,8 +6,8 @@
 channel:
   name: "바다와 항만 이야기"          # 채널명 (대본 인트로/아웃트로에 사용)
   language: "ko"
-  target_minutes: 3                  # 테스트용 길이 (3분으로 단축하여 빠른 검증)
-  scenes: 6                          # 테스트용 장면 수 (6개 장면)
+  target_minutes: 4                  # 3~5분 정통 롱폼 다큐멘터리 분량 (약 4분)
+  scenes: 18                         # 18개 숏(장면당 약 12~14초)으로 빠른 화면 전환
 
 script:
   model: "claude-sonnet-4-6"
@@ -40,7 +40,7 @@ tts:
 video_gen:                           # 핵심 장면 AI 동영상 (Google Flow / Veo 3.1)
   enabled: true
   model: "veo-3.1-generate-preview"
-  max_scenes: 2                      # 시각적 몰입감이 가장 큰 핵심 클라이맥스 2개 장면 AI 동영상 생성
+  max_scenes: 4                      # 핵심 클라이맥스 4개 장면 Google Veo 3.1 AI 동영상 생성
   seconds: 8
   resolution: "1080p"
   slow_factor: 0.8                   # 클립 재생 속도(0.8 = 20% 느리게 → 10초)
