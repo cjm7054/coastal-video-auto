@@ -43,17 +43,14 @@ tts:
   elevenlabs_voice_id: ""
   elevenlabs_model: "eleven_multilingual_v2"
 
-video_gen:                           # 핵심 장면 AI 동영상 (Google Veo 3.1)
-  enabled: true
+video_gen:                           # AI 동영상 생성 (Veo) - 고비용 발생 방지를 위해 완전 비활성화 (편당 500원 이하 유지)
+  enabled: false
   model: "veo-3.1-generate-preview"
-  max_scenes: 4                      # 핵심 4대 승부처(도입 파도, 난관 충격, 공학 메커니즘, 클라이맥스)에 Veo 3.1 집중 투입 (비용 1/4 절감)
-  seconds: 8
+  max_scenes: 0
+  seconds: 0
   resolution: "1080p"
-  slow_factor: 0.8                   # 클립 재생 속도(0.8 = 20% 느리게 → 10초)
-  style_suffix: >
-    smooth cinematic orbital camera pan around photorealistic 3D maritime engineering structure,
-    integrated natural shoreline landscape, realistic fluid dynamic ocean water simulation, slow-motion wave action,
-    hyper-detailed 4k civil engineering visualization, raytraced water reflections, high-end technical animation, no cartoon, no watermark, no text
+  slow_factor: 1.0
+  style_suffix: ""
 
 video:
   fps: 24
