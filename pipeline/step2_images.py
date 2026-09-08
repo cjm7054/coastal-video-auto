@@ -228,11 +228,14 @@ def _fetch_real_coastal_photo(context_text: str, used_urls: set = None) -> bytes
         "User-Agent": "CoastalVideoBot/1.0 (https://github.com/cjm7054/coastal-video-auto; contact@example.com)"
     }
 
-    # 절대로 허용하지 않는 흑백/고문서/도면/설계도/판화 키워드
+    # 절대로 허용하지 않는 문서, 보고서, 흑백, 도면, 설계도, 판화, PDF 키워드
     BANNED_KEYWORDS = [
         "blueprint", "drawing", "engraving", "sketch", "plan", "diagram", "historic",
-        "18", "190", "191", "192", "lithograph", "illustration", "schematic", "patent",
-        "archive", "vintage", "antique", "black and white", "b&w", "monochrome", "woodcut"
+        "18", "190", "191", "192", "193", "194", "195", "196", "197", "198", "199",
+        "lithograph", "illustration", "schematic", "patent", "report", "cover", "title",
+        "archive", "vintage", "antique", "black and white", "b&w", "monochrome", "woodcut",
+        "document", "paper", "text", "book", "bulletin", "publication", "page", "letter",
+        "board", "cerc", "usace", "manual", "technical", "thesis"
     ]
 
     for term in terms:
@@ -249,36 +252,38 @@ def _fetch_real_coastal_photo(context_text: str, used_urls: set = None) -> bytes
             pages = data.get("query", {}).get("pages", {})
             for pid, page in pages.items():
                 title = page.get("title", "").lower()
-                # 고문서, 도면, 흑백 판화, 다이어그램 필터링
+                # 고문서, 도면, 흑백 판화, 다이어그램, PDF 배제
                 if any(bk in title for bk in BANNED_KEYWORDS):
+                    continue
+                if ".pdf" in title or ".djvu" in title:
                     continue
 
                 info_list = page.get("imageinfo", [])
                 if not info_list:
                     continue
                 info = info_list[0]
-                mime = info.get("mime", "")
+                mime = info.get("mime", "").lower()
                 download_url = info.get("thumburl") or info.get("url")
                 
-                # SVG, 비디오, 금지 키워드 URL, 이미 사용된 URL 제외
-                if not download_url or download_url in used_urls or download_url.endswith(".svg"):
+                # PDF, SVG, 문서류 절대 배제
+                if not download_url or download_url in used_urls or "pdf" in mime or "djvu" in mime or download_url.endswith(".svg"):
                     continue
                 if any(bk in download_url.lower() for bk in BANNED_KEYWORDS):
                     continue
 
-                if "jpeg" in mime or "png" in mime or "jpg" in mime or "thumb" in download_url:
+                if "image/jpeg" in mime or "image/png" in mime or download_url.endswith((".jpg", ".jpeg", ".png")):
                     img_resp = requests.get(download_url, headers=headers, timeout=12)
-                    if img_resp.status_code == 200 and len(img_resp.content) > 30000:
+                    if img_resp.status_code == 200 and len(img_resp.content) > 40000:
                         # 흑백 이미지 여부 간이 검사 (RGB 채널 분산 확인)
                         try:
                             sample = Image.open(io.BytesIO(img_resp.content)).convert("RGB").resize((64, 64))
                             pixels = list(sample.getdata())
                             # R, G, B 차이의 평균이 너무 작으면 흑백 사진/청사진
                             color_diff = sum(abs(p[0]-p[1]) + abs(p[1]-p[2]) + abs(p[2]-p[0]) for p in pixels) / len(pixels)
-                            if color_diff < 12.0:  # 흑백 혹은 모노크롬 도면 판정
+                            if color_diff < 15.0:  # 흑백 혹은 모노크롬 도면 판정
                                 continue
                         except Exception:
-                            pass
+                            continue
 
                         used_urls.add(download_url)
                         log.info(f"실사 컬러 사진 아카이브 매칭 성공: {term} -> {title} ({download_url[:60]}...)")
