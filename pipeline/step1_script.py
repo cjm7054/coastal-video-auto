@@ -48,19 +48,26 @@ PROMPT = """당신은 유튜브 100만 조회수를 기록하는 공학 전문 �
   * 가장 시각적 충격이 필요한 핵심 승부처 4개 장면(예: 장면 1 인트로 파도, 장면 3 난관 파도 충격, 장면 6 내부 메커니즘, 장면 8 완성된 방파제)에 "motion": true를 부여하고, 각 장면의 "motion_prompt"를 작성하세요.
   * 나머지 장면은 "motion": false로 설정하세요 (3D 고화질 디오라마 렌더링에 카메라 줌/팬 모션 엔진이 자동 적용됩니다).
 
-[★ 신비한 건축사전 고유의 3D 건축 렌더링 시각 프롬프트 규칙]:
-- 단순한 흐릿한 풍경 사진이 절대 아닙니다. 마이크로소프트/구글/넷플릭스 다큐멘터리 수준의 **'3D 입체 디오라마 단면 투시도(Isometric Cutaway Diorama)'**를 구사해야 합니다.
-- 모든 "image_prompt"는 아래 요소들을 필수로 포함하여 정밀하게 작성하세요:
-  * "Photorealistic 3D architectural cross-section cutaway rendering"
-  * "Detailed engineering diorama on clean dark gradient studio background"
+[★ Google Flow 스타일 시각 스토리보드 & 시각화 규칙 (신비한 건축사전 x OCEAN CODE LAB)]:
+- Google Flow에서 검증된 4대 핵심 비주얼 기법을 프롬프트에 직접 반영합니다:
+  1) [물리적 충격 시각화 (FORCE SIMULATION)]: 파도의 거대한 타격력을 붉은색 에너지 와이어프레임과 충격파 메트릭스로 표현 (예: "Red translucent giant hammer wireframe visual impact symbol showing 100 TONS strike force against seawall, dynamic pressure metrics, holographic engineering HUD")
+  2) [인터로킹 맞물림 3D 시연 (SELF-LOCKING MECHANICS)]: 테트라포드 4개의 다리가 서로 맞물려 자물쇠처럼 고정되는 기하학적 결합 시연 (예: "Glowing blue geometric CAD wireframe highlighting four interlocking legs of concrete tetrapods, self-locking structural mechanism, load distribution vectors")
+  3) [에너지 감쇄 물리 시뮬레이션 (ENERGY DISSIPATION)]: 파도가 블록 틈새를 통과하며 유체 소용돌이와 열/마찰 에너지로 분산되는 전산유체역학(CFD) 단면 (예: "CFD fluid dynamic simulation cross-section of ocean wave passing through armor layer, turbulence dissipation, foam energy reduction, technical cross-section")
+  4) [구조 비교 인포그래픽 (REFLECTION VS ABSORPTION)]: 수직 직립벽(파도를 튕겨냄)과 경사 사석 방파제(파도를 흡수함)의 물리적 차이를 3D 컷어웨이로 대조.
+
+- 모든 "image_prompt"는 아래 요소를 필수로 조합하여 작성하세요:
+  * "Photorealistic 3D architectural cross-section cutaway rendering, detailed civil engineering diorama on clean dark gradient studio background"
   * "Submerged underwater foundation cross-section showing gravel bed, seabed layers, and internal reinforced concrete compartments"
-  * "Subtle red dimension measurement lines, callout arrows, technical architectural layout"
-  * "Octane Render, Cinema 4D, V-Ray hyper-detailed 8k, dramatic studio lighting, ray-traced water transparency"
+  * "Subtle red dimension measurement lines, glowing scientific callout arrows, technical HUD overlay"
+  * "Octane Render, Cinema 4D, hyper-detailed 8k, dramatic studio lighting, ray-traced water transparency"
+
 - "motion_prompt" (Veo 3.1 비디오 지시어):
   * "Smooth cinematic 3D orbital camera panning around the massive cross-section structure, realistic fluid dynamic waves crashing, slow-motion water spray, mechanical cutaway animation"
 
 [나레이션 딕션]:
+- 공식 채널명: OCEAN CODE LAB (OCL)
 - 군더더기 없는 단문 위주의 빠른 템포, 귀에 쏙쏙 박히는 아나운서 해설 톤.
+- 인트로: "안녕하세요, 해양 공학의 모든 비밀을 푸는 OCEAN CODE LAB, OCL입니다." 또는 "여기 OO가 있습니다."
 - 총 {target_minutes}분 분량 ({total_chars}자 내외).
 """
 
