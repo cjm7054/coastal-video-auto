@@ -6,16 +6,17 @@
 channel:
   name: "바다와 항만 이야기"          # 채널명 (대본 인트로/아웃트로에 사용)
   language: "ko"
-  target_minutes: 4                  # 3~5분 정통 롱폼 다큐멘터리 분량 (약 4분)
-  scenes: 18                         # 18개 숏(장면당 약 12~14초)으로 빠른 화면 전환
+  target_minutes: 2.5                # 신비한 건축사전식 압축적이고 몰입감 높은 2~3분 고밀도 다큐멘터리
+  scenes: 10                         # 10개 씬 (장면당 약 15초)으로 늘어짐 없는 빠른 전개
 
 script:
   model: "claude-sonnet-4-6"
   # 대본의 관점·톤. 전문가 채널이지만 시청자는 일반인이라는 점을 명시
   persona: >
-    유튜브 '신비한 건축사전' 스타일의 해안·항만 토목공학 전문 해설가.
+    유튜브 '신비한 건축사전' 총괄 디렉터 스타일의 해안·항만 토목공학 전문 해설가.
     바다와 파도라는 극한의 자연을 상대로 인간이 일구어낸 경이로운 공학적 비밀을
-    빠르고 명확한 딕션, 날카로운 질문(훅), 명쾌한 시각적 비유와 수치로 흥미진진하게 풀어낸다.
+    "여기 OO가 있습니다", "아주 환장할 노릇이죠", "비상한 발상이 등장합니다" 등의
+    흡입력 넘치는 딕션과 3D 디오라마 단면 투시도 묘사로 흥미진진하게 풀어낸다.
 
 images:
   provider: "gemini"                 # gemini (Google Imagen 3/4) | openai (DALL-E 3)
@@ -27,7 +28,7 @@ images:
   style_suffix: >
     photorealistic 3D architectural cross-section cutaway rendering, detailed civil engineering diorama,
     Octane Render, Cinema 4D, V-Ray, hyper-detailed 8k, dramatic dark gradient studio background,
-    subtle red architectural measurement lines, transparent water cutaway showing submerged foundation,
+    subtle red architectural measurement lines and callout arrows, transparent water cutaway showing submerged foundation,
     crisp textures, sharp focus, technical architectural visualization, no cartoon, 16:9
 
 tts:
@@ -37,10 +38,10 @@ tts:
   elevenlabs_voice_id: ""
   elevenlabs_model: "eleven_multilingual_v2"
 
-video_gen:                           # 핵심 장면 AI 동영상 (Google Flow / Veo 3.1)
+video_gen:                           # 핵심 장면 AI 동영상 (Google Veo 3.1)
   enabled: true
   model: "veo-3.1-generate-preview"
-  max_scenes: 18                     # 18개 전 장면 Google Veo 3.1 AI 동영상 생성 (100% 완전 동영상화)
+  max_scenes: 4                      # 핵심 4대 승부처(도입 파도, 난관 충격, 공학 메커니즘, 클라이맥스)에 Veo 3.1 집중 투입 (비용 1/4 절감)
   seconds: 8
   resolution: "1080p"
   slow_factor: 0.8                   # 클립 재생 속도(0.8 = 20% 느리게 → 10초)
