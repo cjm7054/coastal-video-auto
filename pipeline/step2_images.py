@@ -6,7 +6,7 @@ from .common import load_config, ROOT, log
 
 
 def _gemini(prompt: str, cfg: dict) -> bytes:
-    """Google Gemini & Imagen 공식 이미지 생성 API (Interactions API / generate_images / generate_content / OpenAI 호환 엔드포인트)"""
+    """Google Gemini & Imagen 공식 이미지 생성 API (generate_content / generate_images / Interactions API)"""
     from google import genai
     from google.genai import types
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -16,12 +16,78 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
     clean_prompt = prompt[:900]
     client = genai.Client(api_key=api_key)
 
-    # 1. Interactions API (gemini-3.1-flash-image / gemini-3-pro-image-preview)
-    # interactions.create(model=..., input=..., response_modalities=['IMAGE'])
+    # 1. Imagen 공식 models.generate_images (가장 실사 및 토목 렌더링에 적합)
+    imagen_models = [
+        "imagen-3.0-generate-002",
+        "imagen-4.0-generate-001",
+    ]
+    for m in imagen_models:
+        try:
+            log.info(f"Google Imagen({m}) 이미지 생성 시도: {clean_prompt[:60]}...")
+            resp = client.models.generate_images(
+                model=m,
+                prompt=clean_prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    aspect_ratio="16:9",
+                    person_generation="ALLOW_ADULT",
+                    output_mime_type="image/jpeg",
+                )
+            )
+            if resp and resp.generated_images:
+                img_wrapper = resp.generated_images[0]
+                # types.Image 객체 처리
+                img_obj = getattr(img_wrapper, "image", img_wrapper)
+                # 1) image_bytes
+                raw = getattr(img_obj, "image_bytes", None) or getattr(img_obj, "_image_bytes", None)
+                if raw:
+                    return base64.b64decode(raw) if isinstance(raw, str) else raw
+                # 2) PIL Image 호환 또는 save 메서드
+                if hasattr(img_obj, "save"):
+                    buf = io.BytesIO()
+                    img_obj.save(buf, format="JPEG")
+                    return buf.getvalue()
+                if hasattr(img_obj, "as_pil"):
+                    buf = io.BytesIO()
+                    img_obj.as_pil().save(buf, format="JPEG")
+                    return buf.getvalue()
+        except Exception as err:
+            log.warning(f"Google Imagen({m}) 시도 실패: {err}")
+
+    # 2. Gemini 멀티모달 generate_content (IMAGE 출력 모달리티)
+    multimodal_models = ["gemini-3.1-flash-image", "gemini-2.5-flash-image", "gemini-2.0-flash"]
+    for fm in multimodal_models:
+        try:
+            log.info(f"Gemini generate_content({fm}) 멀티모달 생성 시도...")
+            resp = client.models.generate_content(
+                model=fm,
+                contents=clean_prompt,
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                    image_config=types.ImageConfig(aspect_ratio="16:9")
+                ),
+            )
+            # response.parts 순회
+            for part in getattr(resp, "parts", []):
+                if hasattr(part, "as_image"):
+                    try:
+                        pil_img = part.as_image()
+                        buf = io.BytesIO()
+                        pil_img.save(buf, format="PNG")
+                        return buf.getvalue()
+                    except Exception:
+                        pass
+                if getattr(part, "inline_data", None) and part.inline_data.data:
+                    d = part.inline_data.data
+                    return base64.b64decode(d) if isinstance(d, str) else d
+        except Exception as ferr:
+            log.warning(f"Gemini generate_content({fm}) 시도 실패: {ferr}")
+
+    # 3. Interactions API (gemini-3.1-flash-image)
     interactions_models = ["gemini-3.1-flash-image", "gemini-3-pro-image-preview"]
     for im in interactions_models:
         try:
-            log.info(f"Interactions API 모델({im}) 이미지 생성 시도...")
+            log.info(f"Interactions API({im}) 시도...")
             interaction = client.interactions.create(
                 model=im,
                 input=clean_prompt,
@@ -33,66 +99,7 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
                     if d:
                         return base64.b64decode(d) if isinstance(d, str) else d
         except Exception as ierr:
-            log.warning(f"Interactions API({im}) 실패: {ierr}")
-
-    # 2. Gemini 멀티모달 generate_content (response_modalities=['IMAGE'] & image_config)
-    multimodal_models = ["gemini-3.1-flash-image", "gemini-2.5-flash-image", "gemini-2.0-flash"]
-    for fm in multimodal_models:
-        try:
-            log.info(f"Gemini generate_content({fm}) 이미지 생성 시도...")
-            resp = client.models.generate_content(
-                model=fm,
-                contents=clean_prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE"],
-                    image_config=types.ImageConfig(aspect_ratio="16:9")
-                ),
-            )
-            for part in getattr(resp, "parts", []):
-                if getattr(part, "inline_data", None) and part.inline_data.data:
-                    d = part.inline_data.data
-                    return base64.b64decode(d) if isinstance(d, str) else d
-                # part.as_image() 호환
-                if hasattr(part, "as_image"):
-                    try:
-                        img = part.as_image()
-                        buf = io.BytesIO()
-                        img.save(buf, format="PNG")
-                        return buf.getvalue()
-                    except Exception:
-                        pass
-        except Exception as ferr:
-            log.warning(f"Gemini generate_content({fm}) 실패: {ferr}")
-
-    # 3. Imagen 공식 models.generate_images (imagen-3.0-generate-002, imagen-4.0-generate-001)
-    imagen_models = [
-        "imagen-3.0-generate-002",
-        "imagen-4.0-generate-001",
-    ]
-    for m in imagen_models:
-        try:
-            log.info(f"Imagen 모델({m}) 호출 시도...")
-            resp = client.models.generate_images(
-                model=m,
-                prompt=clean_prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    aspect_ratio="16:9",
-                    person_generation="ALLOW_ADULT",
-                    output_mime_type="image/jpeg",
-                )
-            )
-            if resp.generated_images:
-                img_obj = resp.generated_images[0]
-                raw = getattr(img_obj.image, "image_bytes", None)
-                if raw:
-                    return base64.b64decode(raw) if isinstance(raw, str) else raw
-                if hasattr(img_obj.image, "save"):
-                    buf = io.BytesIO()
-                    img_obj.image.save(buf, format="JPEG")
-                    return buf.getvalue()
-        except Exception as err:
-            log.warning(f"Google Imagen({m}) 실패: {err}")
+            log.warning(f"Interactions API({im}) 시도 실패: {ierr}")
 
     # 4. Google Gemini OpenAI 호환 엔드포인트
     try:
@@ -375,7 +382,7 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 except Exception as ge2:
                     log.warning(f"이미지 {sid} {gen_name} 재시도 실패: {ge2}")
 
-        # 3차: 앞선 장면 이미지가 있다면 시각적 일관성을 위해 직전 장면 재사용 (절대 고문서/텍스트 책 표지 노출 금지)
+        # 3차: 앞선 장면 이미지가 있다면 시각적 일관성을 위해 직전 장면 재사용
         if not success:
             prev_imgs = [p for p in paths if p.name != "thumb.png" and p.exists()]
             if prev_imgs:
@@ -383,7 +390,7 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 shutil.copy(prev_imgs[-1], out)
                 success = True
             else:
-                _draw_emergency_coastal_visual(prompt, sid, W, H).save(out, "PNG")
+                raise RuntimeError(f"이미지 {sid} 생성 전체 실패: Google Imagen/Gemini 및 OpenAI 생성이 모두 실패했습니다. API 키 권한이나 할당량을 확인하세요.")
 
         paths.append(out)
         time.sleep(1.0)
