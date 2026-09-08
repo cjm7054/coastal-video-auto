@@ -82,55 +82,48 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
     _concat(parts, joined)
     total = _dur(joined)
 
-    # 자막 파일 준비: ASS 자막 직접 생성 (신비한 건축사전식: 굵은 노란색 본문 + 굵은 검은색 외곽선 5px + 하단 중앙 배치)
+    # 자막 파일 준비: ASS 자막 직접 생성 (신비한 건축사전 스타일: 굵은 노란색 본문 + 굵은 검은색 외곽선 5px + 하단 중앙 배치)
     subs_srt = out_dir / "subtitles.srt"
     subs_ass = tmp / "subs.ass"
-    
-    # SRT 파일로부터 ASS 직접 빌드 (ffmpeg srt->ass 변환 호환성 문제 원천 차단)
-    def _srt_to_ass(srt_path: Path, ass_path: Path):
+    sub_filter = None
+
+    if subs_srt.exists():
         import re
-        content = srt_path.read_text(encoding="utf-8")
+        content = subs_srt.read_text(encoding="utf-8")
         blocks = re.split(r"\n\s*\n", content.strip())
         
-        ass_header = """[Script Info]
-ScriptType: v4.00+
-PlayResX: 1920
-PlayResY: 1080
-ScaledBorderAndShadow: yes
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Noto Sans CJK KR,52,&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,2,60,60,135,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
+        ass_header = (
+            "[Script Info]\n"
+            "ScriptType: v4.00+\n"
+            "PlayResX: 1920\n"
+            "PlayResY: 1080\n"
+            "ScaledBorderAndShadow: yes\n\n"
+            "[V4+ Styles]\n"
+            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+            "Style: Default,Noto Sans CJK KR,52,&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,2,60,60,110,1\n\n"
+            "[Events]\n"
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        )
         events = []
         for block in blocks:
             lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
             if len(lines) >= 3 and "-->" in lines[1]:
                 m = re.match(r"(\d+:\d+:\d+),(\d+)\s*-->\s*(\d+:\d+:\d+),(\d+)", lines[1])
                 if m:
-                    # SRT 00:00:01,234 -> ASS 0:00:01.23
                     s_hms, s_ms, e_hms, e_ms = m.groups()
                     s_ass = f"{int(s_hms.split(':')[0])}:{s_hms.split(':')[1]}:{s_hms.split(':')[2]}.{int(s_ms)//10:02d}"
                     e_ass = f"{int(e_hms.split(':')[0])}:{e_hms.split(':')[1]}:{e_hms.split(':')[2]}.{int(e_ms)//10:02d}"
                     text = "\\N".join(lines[2:])
                     events.append(f"Dialogue: 0,{s_ass},{e_ass},Default,,0,0,0,,{text}")
         
-        ass_path.write_text(ass_header + "\n".join(events) + "\n", encoding="utf-8")
-
-    # 자막 필터 구성: 시스템 폰트 및 로컬 assets/fonts 모두 호환
-    sub_filter = None
-    if subs_srt.exists():
-        # fonts-noto-cjk 패키지 또는 로컬 assets/fonts/NotoSansCJK-Bold.ttc 활용
-        shutil.copy(subs_srt, tmp / "subs.srt")
+        subs_ass.write_text(ass_header + "\n".join(events) + "\n", encoding="utf-8")
+        
         local_font = ROOT / cfg["video"].get("subtitle_font", "assets/fonts/NotoSansCJK-Bold.ttc")
         if local_font.exists():
             shutil.copy(local_font, tmp / "font.ttc")
-            sub_filter = "subtitles=subs.srt:fontsdir=.:force_style='FontName=Noto Sans CJK KR,FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=5,Shadow=2,Alignment=2,MarginV=100'"
-        else:
-            sub_filter = "subtitles=subs.srt:force_style='FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=5,Shadow=2,Alignment=2,MarginV=100'"
+        
+        # ass 필터는 파일 내부(subs.ass)에 스타일이 완벽히 정의되어 있어 filter_complex 구문 파싱 충돌이 전혀 없습니다
+        sub_filter = "ass=subs.ass"
 
     inputs = ["-i", "joined.mp4"]
     fc, vin = [], "[0:v]"
@@ -151,22 +144,37 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         fc.append(f"[{idx}:a]volume={cfg['video']['bgm_volume']}[b];[0:a][b]amix=inputs=2:duration=first:dropout_transition=2[aout]")
         amap = ["-map", "[aout]"]
 
-    # 자막 포함 인코딩
+    # 1차 시도: ASS 자막 합성 렌더링
     fc_with_sub = fc + [f"{vin}{sub_filter}[vout]"] if sub_filter else fc
     vout_map = "[vout]" if sub_filter else (vin if vin != "[0:v]" else "0:v")
     cmd = ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc_with_sub), "-map", vout_map, *amap,
            "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
            "-c:a", "aac", "-movflags", "+faststart", "final.mp4"]
     r = subprocess.run(cmd, cwd=str(tmp), capture_output=True, text=True)
-    if r.returncode != 0:
-        log.warning(f"1차 렌더링 실패 ({r.stderr[-200:].strip()}) → 기본 자막 모드로 재시도")
-        fc_simple = fc + [f"{vin}subtitles=subs.srt[vout]"]
-        cmd_retry = ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc_simple), "-map", "[vout]", *amap,
+
+    # 2차 시도: 혹시 ASS 필터 문제 발생 시 SRT 기본 필터로 재시도
+    if r.returncode != 0 and subs_srt.exists():
+        log.warning(f"1차 ASS 렌더링 실패 ({r.stderr[-200:].strip()}) → SRT 자막으로 재시도")
+        shutil.copy(subs_srt, tmp / "subs.srt")
+        fc_srt = fc + [f"{vin}subtitles=subs.srt[vout]"]
+        cmd_retry = ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc_srt), "-map", "[vout]", *amap,
                      "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
                      "-c:a", "aac", "-movflags", "+faststart", "final.mp4"]
-        r2 = subprocess.run(cmd_retry, cwd=str(tmp), capture_output=True, text=True)
-        if r2.returncode != 0:
-            raise RuntimeError(f"최종 렌더링 실패: {r2.stderr[-2000:]}")
+        r = subprocess.run(cmd_retry, cwd=str(tmp), capture_output=True, text=True)
+
+    # 3차 비상: 자막 실패 시에도 무결한 영상은 보존
+    if r.returncode != 0:
+        log.warning(f"자막 필터 실패 ({r.stderr[-200:].strip()}) → 자막 제외 영상 생성")
+        fc_nosub = fc + [f"{vin}copy[vout]"] if vin != "[0:v]" else fc
+        vmap = "[vout]" if vin != "[0:v]" else "0:v"
+        cmd_nosub = ["ffmpeg", "-y", *inputs]
+        if fc_nosub:
+            cmd_nosub += ["-filter_complex", ";".join(fc_nosub)]
+        cmd_nosub += ["-map", vmap, *amap, "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium",
+                      "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", "final.mp4"]
+        r_nosub = subprocess.run(cmd_nosub, cwd=str(tmp), capture_output=True, text=True)
+        if r_nosub.returncode != 0:
+            raise RuntimeError(f"최종 렌더링 실패: {r_nosub.stderr[-2000:]}")
 
     final = out_dir / "final.mp4"
     shutil.move(str(tmp / "final.mp4"), str(final))
