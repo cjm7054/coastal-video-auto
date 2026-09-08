@@ -100,7 +100,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Noto Sans CJK KR,58,&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,3,2,60,60,80,1
+Style: Default,Noto Sans CJK KR,52,&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,2,60,60,135,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -124,11 +124,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     if subs_srt.exists():
         try:
             _srt_to_ass(subs_srt, subs_ass)
-            sub_filter = "ass=subs.ass"
+            sub_filter = "ass=subs.ass:fontsdir=/usr/share/fonts/opentype/noto"
         except Exception as se:
             log.warning(f"ASS 생성 예외: {se}")
             shutil.copy(subs_srt, tmp / "subs.srt")
-            style = "FontName=Noto Sans CJK KR,FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=5,Shadow=2,Alignment=2,MarginV=80"
+            style = "FontName=Noto Sans CJK KR,FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=5,Shadow=2,Alignment=2,MarginV=110"
             sub_filter = f"subtitles=subs.srt:force_style='{style}'"
 
     inputs = ["-i", "joined.mp4"]
@@ -157,11 +157,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
            "-c:a", "aac", "-movflags", "+faststart", "final.mp4"]
     r = subprocess.run(cmd, cwd=str(tmp), capture_output=True, text=True)
 
-    # 2차 시도: 혹시 필터 이름이나 폰트 매핑 실패 시 subtitles 기본 필터로 재시도
+    # 2차 시도: 혹시 libass 폰트 매핑 실패 시 subtitles 필터로 스타일 강제 지정하여 재시도
     if r.returncode != 0:
-        log.warning(f"1차 자막 필터 에러 ({r.stderr[-250:].strip()}) → srt 기본 필터로 재시도")
+        log.warning(f"1차 자막 필터 에러 ({r.stderr[-250:].strip()}) → subtitles 필터로 재시도")
         shutil.copy(subs_srt, tmp / "subs.srt")
-        fc_sub2 = fc + [f"{vin}subtitles=subs.srt[vout]"]
+        srt_style = "FontSize=28,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,Outline=5,Shadow=2,Alignment=2,MarginV=65"
+        fc_sub2 = fc + [f"{vin}subtitles=subs.srt:force_style='{srt_style}'[vout]"]
         cmd_sub2 = ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc_sub2), "-map", "[vout]", *amap,
                     "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
                     "-c:a", "aac", "-movflags", "+faststart", "final.mp4"]

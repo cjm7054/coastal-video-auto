@@ -17,10 +17,11 @@ def make_thumbnail(script: dict, out_dir: Path) -> Path:
     d = ImageDraw.Draw(im)
     lines = script["thumbnail_text"].replace("\\n", "\n").split("\n")[:2]
     # 신비한 건축사전 시그니처: 강렬한 빨간색 포인트와 굵은 흰색 글씨, 강한 외곽선
+    y_pos = 460
     for i, ln in enumerate(lines):
         color = "#FF2A2A" if i == 0 else "white"
-        d.text((60, y), ln, font=font, fill=color, stroke_width=12, stroke_fill="black")
-        y += cfg["thumbnail"]["font_size"] + 15
+        d.text((60, y_pos), ln, font=font, fill=color, stroke_width=12, stroke_fill="black")
+        y_pos += cfg["thumbnail"]["font_size"] + 15
     out = out_dir / "thumbnail.jpg"
     im.save(out, "JPEG", quality=95)
     log.info("썸네일 완료")
