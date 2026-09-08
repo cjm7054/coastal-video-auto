@@ -37,12 +37,12 @@ PROMPT = """당신은 유튜브 인기 공학 정보 채널 "{channel}"의 전�
   2) [시네마틱 드론 FPV 및 헬리캠 샷 (Cinematic Drone FPV)]: 거대한 규모감을 전달하는 다이내믹 항공 앵글 (예: "Epic cinematic low-altitude FPV drone shot flying towards a massive ocean breakwater being battered by violent 15-meter stormy waves, misty spray, dramatic volumetric lighting, National Geographic documentary 8k")
   3) [초근접 산업 매크로 및 중장비 액션 (Heavy Engineering Action)]: 크레인, 준설선 펌프, 케이슨 침설 등 실제 현장의 박진감 넘치는 액션 (예: "Close-up action photograph of a massive floating crane barge lowering a 2,000-ton concrete block into churning ocean water, heavy steel cables, tension, foaming sea foam, ultra-realistic documentary")
 
-- "motion": true 설정된 장면 (총 {n_motion}개):
-  - 반드시 "motion_prompt"를 함께 작성하세요.
-  - "motion_prompt"에는 파도의 유체 흐름, 카메라 줌인, 크레인의 하강, 선박의 항해 등 명확한 움직임 지시를 영어로 작성하세요. (예: "Smooth cinematic drone forward push-in over raging sea waves crashing against interlocking tetrapods, misty water spray rising, realistic ocean physics")
+- "motion": true 설정 (모든 장면 필수):
+  - 모든 장면에 "motion": true를 부여하고, 각 장면의 동적 연출을 위한 "motion_prompt"를 영문으로 구체적으로 작성하세요.
+  - "motion_prompt"에는 파도의 유체 역학 흐름, 초저고도 FPV 드론 질주, 3D 단면 투시 회전, 크레인의 해상 블록 침설 하강 등 명확하고 생생한 카메라·물체 모션을 영어로 지시하세요. (예: "Dynamic cinematic drone shot flying fast over violent 10-meter ocean waves crashing against concrete tetrapods, realistic water spray and physics, heavy industrial maritime port")
 
 [신비한 건축사전식 필수 4단계 스토리텔링 구조]:
-- 총 장면 수: 정확히 {n_scenes}개 (이 중 시각적 모션 효과가 가장 필요한 핵심 장면 정확히 {n_motion}개는 "motion": true 설정 및 영문 "motion_prompt" 작성)
+- 총 장면 수: 정확히 {n_scenes}개 (모든 {n_scenes}개 장면에 "motion": true 및 고유한 "motion_prompt" 필수 작성)
 - 1단계 [도입·훅 (장면 1)]: "바닷가에서 무심코 지나치는 테트라포드, 그런데 이 거대한 덩어리가 왜 4개의 다리를 가졌는지 알고 계셨나요?" 같은 일상적 시선에서의 강렬한 호기심 유발.
 - 2단계 [위기·난관 (장면 2~4)]: 바다의 가혹한 물리적 한계 제시. "만약 일반 사각 콘크리트 벽을 세운다면 20미터 폭풍 파도의 충격력(수십 톤)을 정면으로 맞아 순식간에 박살 납니다."
 - 3단계 [공학적 해결 (장면 5~15)]: 해안 토목공학의 놀라운 지혜와 수치. "파도를 막는 게 아니라, 틈새로 파도를 통과시켜 스스로 에너지를 상쇄시키는 4차원 인터로킹(맞물림) 메커니즘"을 비유와 핵심 수치로 명쾌하게 해설. (3D 투시도 및 단면도를 집중 배치)

@@ -40,7 +40,7 @@ tts:
 video_gen:                           # 핵심 장면 AI 동영상 (Google Flow / Veo 3.1)
   enabled: true
   model: "veo-3.1-generate-preview"
-  max_scenes: 8                      # 핵심 장면 8개 Google Veo 3.1 AI 동영상 생성 (진짜 모션 영상 비율 확대)
+  max_scenes: 18                     # 18개 전 장면 Google Veo 3.1 AI 동영상 생성 (100% 완전 동영상화)
   seconds: 8
   resolution: "1080p"
   slow_factor: 0.8                   # 클립 재생 속도(0.8 = 20% 느리게 → 10초)
