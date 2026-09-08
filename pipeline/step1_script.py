@@ -30,44 +30,53 @@ PROMPT = """당신은 유튜브 100만 조회수를 기록하는 공학 전문 �
   ]
 }}
 
-[★ 신비한 건축사전 완벽 복제: 4단계 스토리텔링 & 실증 공학 팩트 규칙]:
+[★ 신비한 건축사전 완벽 복제: 4단계 스토리텔링 & 한국형 실증 공학 팩트 규칙]:
 - 총 장면 수: 정확히 {n_scenes}개
-- [절대 엄수: AI 할루시네이션(거짓 정보) 100% 금지 및 공학적 실증성]:
-  * 허구의 기술이나 SF식 상상이 아닌, 실제 해안·항만 설계 기준(KDS 64), 공인 논문(Hudson 공식, Goda 파압 공식, Van der Meer 공식 등), 실제 국내외 항만(부산신항, 영일만항, 울산신항, 로테르담항 등)의 실제 시공 사례와 실증 공법을 근거로 제시하세요.
-  * 구체적 수치(예: "Hudson 공식에 따른 안전 소파중량 50톤", "공극률 50%의 와류 감쇄 효과", "케이슨 내부 속채움 모래 1만 톤", "유의파고 H1/3 12m와 50년 빈도 설계 파력")와 메커니즘을 명확하게 언급하세요.
+- [절대 엄수: 한국 최신 방파제의 90% 이상인 '케이슨 혼성제' 실증 공학 고증]:
+  * 허구의 판타지 구조물이나 외국식 단순 직립제를 배제하고, 실제 한국 주요 항만(부산신항, 포항영일만, 울산신항, 삼척, 울릉도 사동항 등)에 시공된 **'케이슨식 혼성제(Caisson Composite Breakwater)'**를 완벽 고증하세요.
+  * 최신 한국 실증 케이슨 종류를 주제에 맞게 적극 반영:
+    1) **유공 슬릿(Slit) 케이슨**: 파도가 들이치는 전면벽에 세로/가로 슬릿 구멍을 뚫어 챔버(유수실) 내부로 물을 끌어들여 위상차 간섭으로 파력을 40% 이상 상쇄시키는 공법.
+    2) **벌집형(Honeycomb) 복합 케이슨**: 내부 격벽을 정육각형 벌집 모양으로 설계해 콘크리트 자중은 20% 줄이면서 비틀림 강성과 파압 저항력을 극대화한 신공법.
+    3) **소파블록 피복 케이슨 혼성제**: 케이슨 전면에 사석 마운드와 테트라포드(TTP)/시락/아크로포드를 2층 이상 피복하여 쇄파 충격을 1차 흡수하는 복합 구조.
+    4) **인터로킹 키(Interlocking Key) 케이슨**: 케이슨 블록 간 요철 맞물림 전단키를 두어 블록끼리 서로를 지지하는 활동(Sliding) 방지 메커니즘.
+  * 구체적 실증 수치 필수 제시:
+    - 수심 20~40m 해저 사석 마운드(Rubble mound) 두께 5~10m
+    - 아파트 10층 높이, 무게 5,000~10,000톤급 대형 케이슨의 진수(Floating dock) 및 예인 거치
+    - 케이슨 내부 속채움(모래/자갈)으로 얻는 수만 톤 단위의 자중 저항력
+    - Goda 파압 공식 계산 및 50년~100년 빈도 설계 파고(H1/3 10m 이상)에 대한 안정성 검토
 
 - 1단계: 도입 (Hook, 장면 1~2)
   * 반드시 시그니처 멘트 "여기 [구조물 이름]가 있습니다."로 포문을 엽니다.
-  * 일상에서 흔히 보지만 아무도 몰랐던 기괴한 형태나 크기에 날카로운 질문을 던집니다. (예: "왜 하필 네 개의 뿔이 달렸을까?", "수천 톤 콘크리트 박스가 어떻게 물에 뜰까?")
+  * 일상에서 흔히 보지만 아무도 몰랐던 기괴한 형태나 크기에 날카로운 질문을 던집니다. (예: "아파트 10층 크기의 거대한 콘크리트 박스가 어떻게 바다 한가운데 떠서 벽이 될 수 있었을까?", "방파제 벽면에 왜 무수한 구멍이 뚫려 있을까?")
 - 2단계: 난관 (Conflict & Crisis, 장면 3~4)
-  * 자연의 가혹함과 기존 단순 구조물의 한계를 실제 유체역학적 팩트로 극적으로 부각합니다. (수직벽에 가해지는 충격 쇄파압 Goda 공식 압력 수치, 반사파로 인한 세굴 현상, 연약 지반 전단 파괴 등)
+  * 자연의 가혹함과 단순 직립 콘크리트 벽의 치명적 한계를 유체역학적 팩트로 극적으로 부각합니다. (충격 쇄파압 집중, 반사파에 의한 기초 세굴 및 침하, 케이슨 전도 및 활동 파괴 등)
   * 난관의 정점에서 반드시 시그니처 멘트: "아주 환장할 노릇이죠." 또는 "순식간에 산산조각 나기 십상입니다."를 사용합니다.
 - 3단계: 해결 (Resolution & Engineering, 장면 5~8)
-  * 공학자들의 기발한 역발상과 최신 실증 공법(소파블록의 간극 와류 소산, 슬릿형 유공 케이슨의 위상차 간섭 소파 기술, 쇄석 마운드 치환 공법 등)을 논리적으로 제시.
+  * 공학자들의 기발한 역발상과 최신 케이슨 실증 공법(유공 슬릿 유수실 간섭, 벌집형 셀 격벽 구조, 하부 사석 마운드 압밀 치환 및 피복 블록 맞물림)을 논리적으로 제시.
   * 반드시 시그니처 멘트: "비상한 [공학/아이디어]가 등장합니다.", "발상을 완전히 뒤집은 겁니다."를 투입합니다.
-  * 3D 시각화와 실제 공학 공식/수치를 결합하여 공학적 메커니즘을 쾌도난마처럼 풀어냅니다.
+  * 3D 시각화와 실제 공학 메커니즘을 결합하여 왜 한국 바다에 이 케이슨이 놓였는지 쾌도난마처럼 풀어냅니다.
 - 4단계: 요약 및 클로징 (Summary & Outro, 장면 9~10)
-  * "결국 [구조물/기술]은 이렇게 탄생한 겁니다."라는 확정 클로징으로 매듭을 짓고, 인류 토목공학의 위대함을 기리는 3줄 핵심 요약과 감탄을 남깁니다.
+  * "결국 [구조물/기술]은 이렇게 탄생한 겁니다."라는 확정 클로징으로 매듭을 짓고, 한국 해양토목 기술의 위대함을 기리는 3줄 핵심 요약과 감탄을 남깁니다.
 
 - [비디오 모션(Veo) 할당 규칙]:
-  * 가장 시각적 충격이 필요한 핵심 승부처 4개 장면(예: 장면 1 인트로 파도, 장면 3 난관 파도 충격, 장면 6 내부 메커니즘, 장면 8 완성된 방파제)에 "motion": true를 부여하고, 각 장면의 "motion_prompt"를 작성하세요.
+  * 가장 시각적 충격이 필요한 핵심 승부처 4개 장면(예: 장면 1 인트로 거대 케이슨과 파도, 장면 3 파도 타격 난관, 장면 6 유공 슬릿/벌집 내부 메커니즘, 장면 8 완성된 케이슨 혼성제 방파제)에 "motion": true를 부여하고, 각 장면의 "motion_prompt"를 작성하세요.
   * 나머지 장면은 "motion": false로 설정하세요 (3D 고화질 렌더링에 카메라 줌/패닝 모션 엔진이 자동 적용됩니다).
 
-[★ Google Flow 스타일 시각 스토리보드 & 시각화 규칙 (신비한 건축사전 x OCEAN CODE LAB)]:
+[★ Google Flow 스타일 시각 스토리보드 & 한국형 케이슨 시각화 규칙]:
 - Google Flow에서 검증된 4대 핵심 비주얼 기법을 프롬프트에 직접 반영합니다:
-  1) [물리적 충격 시각화 (FORCE SIMULATION)]: 파도의 거대한 타격력을 붉은색 에너지 와이어프레임과 충격파 메트릭스로 표현 (예: "Red translucent giant hammer wireframe visual impact symbol showing 100 TONS strike force against seawall, dynamic pressure metrics, holographic engineering HUD")
-  2) [인터로킹 맞물림 3D 시연 (SELF-LOCKING MECHANICS)]: 테트라포드 4개의 다리가 서로 맞물려 자물쇠처럼 고정되는 기하학적 결합 시연 (예: "Glowing blue geometric CAD wireframe highlighting four interlocking legs of concrete tetrapods, self-locking structural mechanism, load distribution vectors")
-  3) [에너지 감쇄 물리 시뮬레이션 (ENERGY DISSIPATION)]: 파도가 블록 틈새를 통과하며 유체 소용돌이와 열/마찰 에너지로 분산되는 전산유체역학(CFD) 단면 (예: "CFD fluid dynamic simulation cross-section of ocean wave passing through armor layer, turbulence dissipation, foam energy reduction, technical cross-section")
-  4) [구조 비교 인포그래픽 (REFLECTION VS ABSORPTION)]: 수직 직립벽(파도를 튕겨냄)과 경사 사석 방파제(파도를 흡수함)의 물리적 차이를 3D 컷어웨이로 대조.
+  1) [물리적 충격 시각화 (FORCE SIMULATION)]: 파도의 거대한 타격력을 붉은색 에너지 와이어프레임과 충격파 메트릭스로 표현 (예: "Red translucent giant wave pressure vector HUD showing 100 TONS strike force against caisson wall, dynamic pressure metrics, holographic engineering HUD")
+  2) [케이슨 유공벽/벌집 셀 3D 내부 투시 (INTERNAL CELL MECHANICS)]: 슬릿 유공벽을 통과해 챔버에서 부딪히는 수류, 또는 정육각형 벌집형 내부 셀 격벽(Hexagonal honeycomb cell compartments)의 하중 분산 와이어프레임.
+  3) [사석 마운드와 소파블록 하부 단면 (RUBBLE MOUND & ARMOR LAYER)]: 해저 지반 위의 사석 기초 마운드(Rubble mound bedding), 피복석(Riprap), 테트라포드 연동 맞물림 및 수중 세굴 방지공(Scour protection).
+  4) [구조 비교 인포그래픽 (SOLID VS SLIT CAISSON)]: 일반 직립 케이슨(파도를 그대로 튕겨냄)과 유공 슬릿 케이슨(챔버 내 수면 진동으로 파도를 흡수 소파)의 파동 위상차(Phase-shift wave dissipation) 대조.
 
 - 모든 "image_prompt"는 아래 요소를 필수로 조합하여 작성하세요:
-  * "Photorealistic 3D cinematic aerial ocean perspective, detailed coastal maritime engineering in expansive natural shoreline landscape"
-  * "Submerged underwater foundation view showing gravel bedding, natural seabed contours, and reinforced concrete structure seamlessly integrated with ocean environment"
-  * "Subtle red dimension measurement lines, glowing scientific callout arrows, technical HUD overlay"
-  * "Octane Render, Cinema 4D, hyper-detailed 8k, natural daylight and atmospheric ocean spray, ray-traced water transparency"
+  * "Clean stylish 3D isometric architectural engineering illustration of modern Korean caisson composite breakwater, showing detailed perforated slit wave chambers or hexagonal honeycomb cell compartments on heavy rubble mound"
+  * "Visible submerged foundation showing riprap gravel bedding, seabed contours, and interlocking armor blocks with clear vibrant ocean water"
+  * "Prominent red dimension measurement lines, bold engineering line-art accents, glowing scientific callout arrows, technical HUD infographic overlay"
+  * "Cinema 4D, Octane Render isometric view, hyper-clean textures, sharp focus, professional technical explainer illustration style like Mysterious Architecture Dictionary, 16:9"
 
 - "motion_prompt" (Veo 3.1 비디오 지시어):
-  * "Continuous smooth dynamic cinematic 3D orbital camera flight around massive coastal engineering structure, realistic fluid dynamic waves crashing, slow-motion water spray, active coastal atmosphere"
+  * "Continuous smooth dynamic 3D orbital camera flight around massive Korean caisson engineering structure, active fluid dynamic ocean waves rushing into slit chambers, slow-motion water spray, clean cinematic technical animation"
 
 [나레이션 딕션]:
 - 공식 채널명: OCEAN CODE LAB (OCL)
