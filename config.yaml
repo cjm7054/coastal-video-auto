@@ -33,9 +33,12 @@ images:
     dramatic cinematic volumetric lighting, Unreal Engine 5 render, Octane photorealistic, highly detailed physical concrete texture, 8k, professional documentary engineering visual, 16:9
 
 tts:
-  provider: "edge"                   # edge(무료) | elevenlabs(유료, 고품질)
-  edge_voice: "ko-KR-InJoonNeural"   # 신뢰감 있고 귀에 쏙쏙 박히는 남성 다큐멘터리 해설 톤 (InJoon)
-  rate: "+6%"                        # 유튜브 다큐에 최적화된 빠르고 몰입감 넘치는 템포 (+6%)
+  provider: "typecast"               # typecast(유료 모건 보이스) | edge(무료) | elevenlabs(유료)
+  typecast_voice_id: "tc_6256118ea1103af69f0a87ec"   # 모건 (다큐멘터리/광고/해설 최고급 남성 톤)
+  typecast_model: "ssfm-v30"
+  typecast_tempo: 1.05               # 1.0~1.1 (다큐에 적합한 몰입감 있는 템포)
+  edge_voice: "ko-KR-InJoonNeural"   # 비상용 백업
+  rate: "+6%"
   elevenlabs_voice_id: ""
   elevenlabs_model: "eleven_multilingual_v2"
 

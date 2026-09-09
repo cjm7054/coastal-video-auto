@@ -63,17 +63,73 @@ def _words_to_cues(words, max_chars=22):
     return cues
 
 
+def _typecast_one(text: str, mp3: Path, cfg: dict):
+    """Typecast AI 공식 REST API를 통한 유료 '모건' 보이스 합성"""
+    import requests
+    api_key = os.environ.get("TYPECAST_API_KEY", "").strip()
+    voice_id = os.environ.get("TYPECAST_VOICE_ID", "").strip() or cfg["tts"].get("typecast_voice_id", "tc_6256118ea1103af69f0a87ec")
+    model = cfg["tts"].get("typecast_model", "ssfm-v30")
+    tempo = cfg["tts"].get("typecast_tempo", 1.05)
+
+    if not api_key:
+        raise ValueError("TYPECAST_API_KEY가 설정되지 않았습니다.")
+
+    url = "https://api.typecast.ai/v1/text-to-speech"
+    headers = {
+        "Content-Type": "application/json",
+        "X-API-KEY": api_key
+    }
+    payload = {
+        "voice_id": voice_id,
+        "text": text,
+        "model": model,
+        "language": "kor",
+        "output": {
+            "volume": 100,
+            "audio_pitch": 0,
+            "audio_tempo": tempo,
+            "audio_format": "mp3"
+        }
+    }
+
+    resp = requests.post(url, headers=headers, json=payload, timeout=60)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Typecast API 호출 실패 ({resp.status_code}): {resp.text}")
+
+    mp3.write_bytes(resp.content)
+    
+    # 균등 타임스탬프 계산 (단어 단위 자막 생성용)
+    total_dur = _mp3_duration(mp3)
+    raw_words = text.split()
+    words = []
+    if raw_words:
+        per_word = total_dur / len(raw_words)
+        for i, w in enumerate(raw_words):
+            words.append((i * per_word, (i + 1) * per_word, w))
+    return words
+
+
 def generate_audio(script: dict, out_dir: Path) -> dict:
     cfg = load_config()
-    prov = cfg["tts"]["provider"]
+    prov = cfg["tts"].get("provider", "typecast")
     timeline, t0, srt_lines, idx = [], 0.0, [], 1
     for sc in script["scenes"]:
         mp3 = out_dir / "audio" / f"{sc['id']}.mp3"
         text = sc["narration"]
-        if prov == "elevenlabs":
+        words = None
+        
+        if prov == "typecast":
+            try:
+                log.info(f"타입캐스트 모건 보이스 합성 중: 장면 {sc['id']}...")
+                words = _typecast_one(text, mp3, cfg)
+            except Exception as te:
+                log.warning(f"타입캐스트 합성 실패 ({te}) → Edge-TTS 자동 대체")
+                words = asyncio.run(_edge_one(text, mp3, cfg["tts"]["edge_voice"], cfg["tts"]["rate"]))
+        elif prov == "elevenlabs":
             words = _elevenlabs_one(text, mp3, cfg)
         else:
             words = asyncio.run(_edge_one(text, mp3, cfg["tts"]["edge_voice"], cfg["tts"]["rate"]))
+
         dur = _mp3_duration(mp3) + 0.4  # 장면 사이 0.4초 여유
         for s, e, w in _words_to_cues(words):
             srt_lines.append(f"{idx}\n{_fmt(t0 + s)} --> {_fmt(t0 + e)}\n{w}\n"); idx += 1
