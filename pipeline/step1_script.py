@@ -1,7 +1,5 @@
-"""1단계: 주제 → 장면별 대본(JSON). Claude API 사용."""
 import os, json, re
 from pathlib import Path
-import anthropic
 from .common import load_config, save_json, log
 
 PROMPT = """당신은 유튜브 100만 조회수를 기록하는 공학 전문 채널 '신비한 건축사전'의 메인 총괄 디렉터 겸 수석 대본 작가입니다.
@@ -107,6 +105,7 @@ def generate_script(topic: str, out_dir: Path) -> dict:
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if anthropic_key and not anthropic_key.startswith("sk-ant-..."):
         try:
+            import anthropic
             client = anthropic.Anthropic(api_key=anthropic_key)
             for attempt in range(3):
                 with client.messages.stream(
