@@ -11,16 +11,13 @@ channel:
 
 script:
   model: "claude-sonnet-4-6"
-  # 대본의 관점·톤: 실제 한국 해역(동해, 남해, 서해)에 축조된 최신 케이슨 혼성제 및 소파블록 방파제 공학 해설
+  # 대본의 관점·톤: OCEAN CODE LAB (OCL) 오리지널 고밀도 해양 공학 다큐멘터리
   persona: >
-    한국 해안·항만 토목공학 최고 권위의 전문 지식을 갖춘 유튜브 '신비한 건축사전' 총괄 디렉터 스타일의 메인 해설가.
-    근거 없는 AI 상상(할루시네이션)을 철저히 배제하고, 실제 해양수산부 항만및어항설계기준(KDS 64 10),
-    한국 주요 무역항(부산신항, 포항영일만항, 울산신항, 삼척, 울릉사동항 등)에 실제로 시공된
-    '케이슨식 혼성제(Composite Breakwater with Caisson)'를 중심으로 해설한다.
-    단순 직립벽 케이슨뿐만 아니라 최신 한국 실증 특허 및 신기술 공법인
-    '유공 슬릿(Slit) 케이슨(전면 유공벽 파력 감쇄)', '벌집형(Honeycomb) 복합 케이슨', '곡면 반사파 흡수 케이슨',
-    '인터로킹 키(Key) 접합식 케이슨', '기초 사석 마운드 및 근고블록 세굴 방지공', '소파블록(테트라포드, 아크로포드, 시락 등) 피복 혼성제' 등
-    실제 현장 도면과 수리모형실험 검증 공법의 구조적 디테일을 정확하고 흥미진진하게 풀어낸다.
+    대한민국 해안·항만 토목공학의 본질을 밝히는 전문 다큐멘터리 채널 'OCEAN CODE LAB (OCL)' 메인 내레이터 겸 수석 공학 분석관.
+    유행어나 가벼운 클리셰를 철저히 배제하고, 압도적인 해양 물리 스케일(수만 톤 자중, 수심 30m, 10m 괴물 파고)과
+    실제 해양수산부 항만및어항설계기준(KDS 64 10), 한국 주요 무역항(부산신항, 포항영일만, 울산신항, 삼척, 울릉도 사동항 등)에 축조된
+    실제 케이슨 혼성제(유공 슬릿, 벌집형 복합 셀, 인터로킹 전단키, 사석 마운드 및 테트라포드 연동)의 도면과 수리역학 팩트를 기반으로
+    지적이고 묵직하며 몰입감 넘치는 명품 다큐멘터리를 전개한다.
 
 images:
   provider: "openai"                 # gemini (Google Imagen 3/4) | openai (DALL-E 3)
@@ -28,13 +25,12 @@ images:
   openai_model: "dall-e-3"
   width: 1920
   height: 1080
-  # 모든 이미지에 공통 적용되는 스타일 (신비한 건축사전 특유의 세련되고 명쾌한 3D 엔지니어링 일러스트 & 조감도)
+  # Unreal Engine 5 기반 실사풍 3D 건축/해저 단면 투시도(Cross-section cutaway) & 파압 벡터 HUD 오버레이
   style_suffix: >
-    clean and stylish 3D isometric architectural engineering illustration style, 'Mysterious Architecture Dictionary' YouTube visual style,
-    modern Korean reinforced concrete caisson composite breakwater, detailed perforated slit wave chambers, honeycomb cell internal structure,
-    rubble mound foundation, bold engineering line-art accents, subtle red measurement dimension callouts and arrows,
-    vibrant clear water with visible underwater foundation and scour blocks, Cinema 4D, Octane Render isometric view,
-    hyper-clean textures, sharp focus, professional technical explainer illustration, no photorealistic muddy noise, 16:9
+    An isometric 3D architectural engineering cross-section cutaway diagram of a massive modern Korean reinforced concrete caisson composite breakwater in the deep ocean,
+    photorealistic cross-section showing detailed soil and seabed rock layers, heavy rubble mound bedding, submerged riprap gravel,
+    perforated slit wave chambers with active water intake, glowing red hydrodynamic pressure vectors and HUD engineering callout lines,
+    dramatic cinematic volumetric lighting, Unreal Engine 5 render, Octane photorealistic, highly detailed physical concrete texture, 8k, professional documentary engineering visual, 16:9
 
 tts:
   provider: "edge"                   # edge(무료) | elevenlabs(유료, 고품질)
