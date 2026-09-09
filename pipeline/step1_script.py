@@ -161,6 +161,52 @@ def generate_script(topic: str, out_dir: Path) -> dict:
     if script is None:
         raise RuntimeError("대본 JSON 생성 실패 - API 키 및 로그 확인 필요")
 
+    # [★ Ruflo Swarm Multi-Agent Reviewer & Scale Director 연동]
+    # 장난감 모형 느낌을 방지하고 실제 한국 항만 스케일과 공학 팩트를 강제 주입하는 2단계 교차 감수
+    try:
+        openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if openai_key:
+            from openai import OpenAI
+            r_client = OpenAI(api_key=openai_key)
+            log.info("Ruflo Swarm: Engineering Reviewer & Visual Director 에이전트 교차 감수 시작...")
+            
+            review_prompt = f"""당신은 Ruflo Swarm의 'Engineering Reviewer' 및 'Visual Scale Director' 에이전트입니다.
+아래 대본 JSON의 각 장면 프롬프트가 '장난감 수족관 블록'처럼 렌더링되는 치명적 문제를 막기 위해 감수 및 전면 보강하세요.
+
+대본 제목: {script.get('title', '')}
+현재 씬 목록: {json.dumps(script['scenes'], ensure_ascii=False)}
+
+[Ruflo 감수 및 강화 필수 지침]:
+1. [장난감 느낌 완전 박멸 - 압도적 스케일 레퍼런스 강제]:
+   - 모든 image_prompt에 실제 거대함을 증명하는 비교 객체(Scale Reference)를 반드시 포함:
+     * "500-ton giant floating crane ship", "huge construction tugboat", "human civil engineering workers wearing helmets standing on top", "50-ton tetrapods stacked in multiple layers"
+2. [실제 한국 항만 케이슨 구조물 질감 및 디테일 고증]:
+   - "weathered rough marine concrete texture", "massive perforated slit wave dissipating wall", "hexagonal honeycomb internal cells with sand and gravel infill", "heavy riprap gravel foundation"
+3. [Unreal Engine 5 단면 투시도(Cross-section cutaway) 유지]:
+   - "wide cinematic 16:9 aerial cross-section view showing seabed bedrock, rubble mound bedding, and vertical slit caisson rising out of deep ocean"
+
+위 감수 기준을 적용하여, 수정된 scenes 배열만 JSON 형태로 반환하세요:
+[
+  {{"id": 1, "narration": "...", "image_prompt": "...", "motion": false}},
+  ...
+]
+"""
+            r_resp = r_client.chat.completions.create(
+                model="gpt-4.1-mini",
+                messages=[{"role": "user", "content": review_prompt}],
+                temperature=0.3,
+            )
+            r_text = r_resp.choices[0].message.content.strip()
+            r_text = re.sub(r"^```(json)?\s*|\s*```$", "", r_text, flags=re.M).strip()
+            si, sj = r_text.find("["), r_text.rfind("]")
+            if si >= 0 and sj > si:
+                enhanced_scenes = json.loads(r_text[si:sj + 1])
+                if len(enhanced_scenes) == len(script["scenes"]):
+                    script["scenes"] = enhanced_scenes
+                    log.info(f"Ruflo Swarm: 16개 씬 전체 공학 스케일 및 단면 프롬프트 보강 완료!")
+    except Exception as r_err:
+        log.warning(f"Ruflo Swarm 교차 감수 스킵(기본 대본 유지): {r_err}")
+
     script["topic"] = topic
     assert len(script["scenes"]) >= 3, "장면 수가 너무 적습니다"
     save_json(out_dir / "script.json", script)
