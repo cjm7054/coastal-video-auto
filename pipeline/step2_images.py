@@ -357,7 +357,9 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
         if out.exists():
             paths.append(out)
             continue
-        prompt = f"{p}. {suffix}"
+        # [Ruflo Visual Guard] 장난감/미니어처/플라스틱 모형 방지 및 실제 토목 스케일 가이드
+        scale_guard = "Photorealistic maritime civil engineering, massive scale, no miniature, no plastic toy, real weathered concrete and rough sea environment."
+        prompt = f"{p}. {scale_guard} {suffix}"
         success = False
 
         # 1차: AI 이미지 생성기 (DALL-E 3 또는 Google Imagen)

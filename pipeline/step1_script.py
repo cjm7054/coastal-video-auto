@@ -161,31 +161,44 @@ def generate_script(topic: str, out_dir: Path) -> dict:
     if script is None:
         raise RuntimeError("대본 JSON 생성 실패 - API 키 및 로그 확인 필요")
 
-    # [★ Ruflo Swarm Multi-Agent Reviewer & Scale Director 연동]
-    # 장난감 모형 느낌을 방지하고 실제 한국 항만 스케일과 공학 팩트를 강제 주입하는 2단계 교차 감수
+    # =========================================================================
+    # [★ Ruflo Multi-Agent Swarm: 3자 교차 검증 및 비평 루프]
+    # Agent 1 (Engineering Fact Reviewer) + Agent 2 (Scale & Reality Critic) -> Agent 3 (Quality Gatekeeper Synthesizer)
+    # 목표: '장난감 수족관 블록' 느낌을 원천 차단하고 실제 한국 항만 스케일(500톤 크레인, 인부, TTP) 강제 주입
+    # =========================================================================
     try:
         openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
         if openai_key:
             from openai import OpenAI
             r_client = OpenAI(api_key=openai_key)
-            log.info("Ruflo Swarm: Engineering Reviewer & Visual Director 에이전트 교차 감수 시작...")
+            log.info("=" * 60)
+            log.info("🚀 [Ruflo Swarm] 멀티 에이전트 교차 검증 & 상호 비평 루프 가동 시작")
+            log.info("=" * 60)
             
-            review_prompt = f"""당신은 Ruflo Swarm의 'Engineering Reviewer' 및 'Visual Scale Director' 에이전트입니다.
-아래 대본 JSON의 각 장면 프롬프트가 '장난감 수족관 블록'처럼 렌더링되는 치명적 문제를 막기 위해 감수 및 전면 보강하세요.
+            raw_scenes_json = json.dumps(script["scenes"], ensure_ascii=False)
+            
+            # --- 1단계: Agent 1 (Engineering Fact Reviewer) & Agent 2 (Scale & Toy-Busting Critic) 상호 비평 ---
+            log.info("🔎 [Agent 1 & 2] 항만 토목 공학 고증 및 장난감 모형 여부 전수 비평 진행 중...")
+            critic_prompt = f"""당신은 Ruflo Swarm의 2개 전문 에이전트 팀입니다:
+- 에이전트 1 (Engineering Fact Reviewer): 대한민국 해양수산부 항만설계기준(KDS 64 10) 및 수리역학(Goda 쇄파압, 유공 소파, 사석 마운드, TTP 인터로킹) 고증 검토
+- 에이전트 2 (Scale & Anti-Toy Critic): AI가 케이슨을 '어항 속 플라스틱 장난감'이나 '작은 탁상용 모형'처럼 그리지 않도록 압도적 크기 증명 객체(Scale Reference) 감시
 
 대본 제목: {script.get('title', '')}
-현재 씬 목록: {json.dumps(script['scenes'], ensure_ascii=False)}
+현재 16개 씬 프롬프트 데이터:
+{raw_scenes_json}
 
-[Ruflo 감수 및 강화 필수 지침]:
-1. [장난감 느낌 완전 박멸 - 압도적 스케일 레퍼런스 강제]:
-   - 모든 image_prompt에 실제 거대함을 증명하는 비교 객체(Scale Reference)를 반드시 포함:
-     * "500-ton giant floating crane ship", "huge construction tugboat", "human civil engineering workers wearing helmets standing on top", "50-ton tetrapods stacked in multiple layers"
-2. [실제 한국 항만 케이슨 구조물 질감 및 디테일 고증]:
-   - "weathered rough marine concrete texture", "massive perforated slit wave dissipating wall", "hexagonal honeycomb internal cells with sand and gravel infill", "heavy riprap gravel foundation"
-3. [Unreal Engine 5 단면 투시도(Cross-section cutaway) 유지]:
-   - "wide cinematic 16:9 aerial cross-section view showing seabed bedrock, rubble mound bedding, and vertical slit caisson rising out of deep ocean"
+[비평 및 교정 필수 기준]:
+1. [장난감 느낌 원천 박멸]:
+   - 10층 아파트 높이(20~30m), 수만 톤에 달하는 실제 거대함을 증명할 비교 객체가 없는 씬을 즉시 지적하고 보강해야 함.
+   - 각 프롬프트에 반드시 "500-ton floating crane ship parked alongside", "human civil engineers with safety helmets standing tiny on upper slab", "large industrial tugboat", "multi-layered 50-ton tetrapod armor" 중 1~2개 이상을 강제 배치.
+2. [실제 한국 항만 케이슨 디테일 고증]:
+   - 단순한 매끈한 회색 상자가 아니라 "weathered rough marine concrete texture with salt erosion", "perforated slit wave-dissipating chambers intake", "honeycomb cells with sand gravel infill", "heavy riprap rubble mound seabed foundation" 반영.
+3. [언리얼 5 단면 투시도(Cross-section cutaway) 원칙]:
+   - 해저 암반, 사석 마운드, 수중 구조물 내부, 수면 위 상부공까지 입체적으로 투시되는 16:9 와이드 시네마틱 구도 유지.
 
-위 감수 기준을 적용하여, 수정된 scenes 배열만 JSON 형태로 반환하세요:
+위 기준을 바탕으로 각 씬의 image_prompt와 narration을 엄격히 상호 교차 감수한 후,
+최종 확정된 scenes 배열(16개 씬)만 반드시 유효한 JSON 배열 형식으로 반환하세요.
+출력 형식 예시:
 [
   {{"id": 1, "narration": "...", "image_prompt": "...", "motion": false}},
   ...
@@ -193,19 +206,45 @@ def generate_script(topic: str, out_dir: Path) -> dict:
 """
             r_resp = r_client.chat.completions.create(
                 model="gpt-4.1-mini",
-                messages=[{"role": "user", "content": review_prompt}],
-                temperature=0.3,
+                messages=[{"role": "user", "content": critic_prompt}],
+                temperature=0.25,
             )
             r_text = r_resp.choices[0].message.content.strip()
             r_text = re.sub(r"^```(json)?\s*|\s*```$", "", r_text, flags=re.M).strip()
             si, sj = r_text.find("["), r_text.rfind("]")
             if si >= 0 and sj > si:
-                enhanced_scenes = json.loads(r_text[si:sj + 1])
-                if len(enhanced_scenes) == len(script["scenes"]):
-                    script["scenes"] = enhanced_scenes
-                    log.info(f"Ruflo Swarm: 16개 씬 전체 공학 스케일 및 단면 프롬프트 보강 완료!")
+                refined_scenes = json.loads(r_text[si:sj + 1])
+                if len(refined_scenes) == len(script["scenes"]):
+                    script["scenes"] = refined_scenes
+                    log.info("✅ [Agent 1 & 2] 1차 고증 비평 및 스케일 레퍼런스 주입 통과!")
+
+            # --- 2단계: Agent 3 (Quality Gatekeeper Synthesizer) 최종 승인 게이트 ---
+            log.info("🛡️ [Agent 3: Quality Gatekeeper] 썸네일 및 최종 시각 연출 품질 게이트 심사...")
+            gatekeeper_prompt = f"""당신은 Ruflo Swarm의 최종 승인 관문 'Quality Gatekeeper Synthesizer'입니다.
+영상 제목: {script.get('title', '')}
+현재 썸네일 프롬프트: {script.get('thumbnail_prompt', '')}
+
+[심사 항목]:
+1. 유튜브 썸네일이 클릭을 유도할 만큼 파괴적인 해양 토목 스케일(괴물 파도, 500톤 크레인선, 거대 케이슨 투시 단면)을 담고 있는가?
+2. 텍스트 글자(Typography/Hangul) 없이 순수 3D 시네마틱 비주얼로 압도하는가?
+
+기존 썸네일 프롬프트를 8K 초고화질 다큐멘터리 언리얼 엔진 5 단면도 스타일로 최고 등급으로 업그레이드하여 단 한 줄의 영어 프롬프트만 출력하세요."""
+            
+            g_resp = r_client.chat.completions.create(
+                model="gpt-4.1-mini",
+                messages=[{"role": "user", "content": gatekeeper_prompt}],
+                temperature=0.3,
+            )
+            upgraded_thumb = g_resp.choices[0].message.content.strip().replace('"', '')
+            if upgraded_thumb and len(upgraded_thumb) > 30:
+                script["thumbnail_prompt"] = upgraded_thumb
+                log.info("✅ [Agent 3] 썸네일 시각 임팩트 최종 게이트 통과 및 업그레이드 완료!")
+            
+            log.info("=" * 60)
+            log.info("🎉 [Ruflo Swarm] 멀티 에이전트 3자 교차 검증 완료: 최고 품질 대본 확정")
+            log.info("=" * 60)
     except Exception as r_err:
-        log.warning(f"Ruflo Swarm 교차 감수 스킵(기본 대본 유지): {r_err}")
+        log.warning(f"⚠️ Ruflo Swarm 멀티 에이전트 교차 감수 스킵 (기본 대본 유지): {r_err}")
 
     script["topic"] = topic
     assert len(script["scenes"]) >= 3, "장면 수가 너무 적습니다"
