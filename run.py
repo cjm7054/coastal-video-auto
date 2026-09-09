@@ -62,6 +62,13 @@ def main():
         video = assemble(script, timeline, job, motion_clips)
     thumb = make_thumbnail(script, job)
 
+    # [★ 비용 및 크레딧 결산 브리핑 - 깃허브 Actions Step Summary 및 로그 자동 기록]
+    try:
+        from pipeline.cost_tracker import tracker
+        tracker.save_and_brief(job)
+    except Exception as te:
+        log.warning(f"크레딧 결산 기록 실패: {te}")
+
     if a.no_upload:
         log.info(f"검토용 완료 → {job}"); return
     url = upload(script, video, thumb)

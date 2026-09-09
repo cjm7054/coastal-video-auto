@@ -13,10 +13,10 @@ PROMPT = """당신은 대한민국 해안·항만 토목공학의 본질을 밝�
 
 {{
   "title": "유튜브 제목 (강렬한 지적 호기심과 실제 공학 수치를 결합한 명품 다큐 제목)",
-  "thumbnail_text": "썸네일용 굵고 직관적인 핵심 텍스트 2줄 (줄바꿈 \\n, '수심 30m 해저 비밀\\n1만톤 케이슨의 진실')",
-  "thumbnail_prompt": "썸네일용 Unreal Engine 5 단면 투시도 렌더링 프롬프트 (영어, 거대한 해저 지층 단면, 붉은 파압 벡터선과 콘크리트 절단면)",
+  "thumbnail_text": "썸네일용 굵고 직관적인 핵심 텍스트 2줄 (줄바꿈 \\n)",
+  "thumbnail_prompt": "썸네일용 Unreal Engine 5 단면 투시도 렌더링 프롬프트 (영어, 단면)",
   "description": "영상 설명란 텍스트 (시청자 지적 호기심 유발 문장 + K-공학 핵심 메커니즘 팩트 요약 + 해시태그 5개)",
-  "tags": ["항만", "해안공학", "토목공학", "케이슨방파제", "부산신항", "바다"],
+  "tags": ["항만", "해안공학", "토목공학", "바다"],
   "scenes": [
     {{
       "id": 1,
@@ -28,40 +28,38 @@ PROMPT = """당신은 대한민국 해안·항만 토목공학의 본질을 밝�
   ]
 }}
 
-[★ OCEAN CODE LAB (OCL) 오리지널 4대 스토리텔링 공학 프레임워크]:
-- 총 장면 수: 정확히 {n_scenes}개 (씬당 약 6~8초 내외의 숨 막히는 긴장감과 속도감 있는 전개)
-- [절대 엄수: 한국 최신 방파제의 90% 이상인 '케이슨 혼성제' 실증 공학 고증]:
-  * 허구의 가상 구조물을 배제하고, 실제 한국 주요 항만(부산신항, 포항영일만, 울산신항, 삼척, 울릉도 사동항 등)에 시공된 **'케이슨식 혼성제(Caisson Composite Breakwater)'**의 도면을 정밀 고증하세요.
-  * 최신 한국 실증 케이슨 공법을 입체적으로 해부:
-    1) **유공 슬릿(Slit) 케이슨**: 전면 유공벽 슬릿 구멍을 통해 파도를 유수실(Chamber) 내부로 유입시켜, 내부 반사파와 후속 입사파의 위상차(Phase-shift) 간섭으로 파동 에너지를 40% 이상 자가 소멸시키는 공법.
-    2) **벌집형(Honeycomb) 복합 케이슨**: 내부 격벽을 정육각형 벌집 셀로 설계해 콘크리트 자중은 20% 절감하면서도 비틀림 강성과 파압 저항력을 극대화한 구조.
-    3) **소파블록 피복 혼성제**: 케이슨 전면에 사석 마운드와 초대형 테트라포드(TTP 50톤~80톤급), 시락, 아크로포드를 2층 이상 맞물려 거치하여 쇄파 충격을 1차 감쇄하는 복합 방파제.
-    4) **인터로킹 키(Interlocking Key) 접합식 케이슨**: 케이슨 블록 사이에 요철형 전단키를 시공해 개별 블록이 수만 톤의 파압에도 밀리지 않고 일체로 거동하게 만드는 활동(Sliding) 방지 메커니즘.
-  * 구체적 실증 공학 수치 필수 반영:
-    - 수심 20~40m 해저 사석 마운드(Rubble mound) 두께 5~10m 및 기초 지반 개량
-    - 아파트 10층 높이, 무게 5,000~10,000톤급 콘크리트 박스의 플로팅 독(Floating dock) 진수 및 해상 예인 거치
-    - 케이슨 내부 모래·자갈 속채움(Infill)으로 확보하는 수만 톤 단위의 자중 저항 모멘트
-    - Goda 파압 공식과 50년~100년 빈도 극한 설계 파고(H1/3 10m 이상)에 대한 전도·활동 안전율
+[★ OCEAN CODE LAB (OCL) 토목공학 엄격 고증 분류 체계]:
+- 총 장면 수: 정확히 {n_scenes}개 (씬당 약 6~8초 내외의 빠른 템포)
+- [절대 원칙: 공학적 사실(Fact) 및 실제 시공 기술 100% 일치 - 허위/날조 절대 금지]:
+  주제({topic})의 성격에 따라 사용되는 토목 구조물이 완전히 다릅니다. 혼동하여 엉뚱한 구조물을 설명하지 마세요:
 
-- 1단계: 거대 스펙의 역설 (Paradox of Scale, 장면 1~3)
-  * 오프닝 5초 만에 바다 한가운데 버티고 선 거대 구조물의 압도적 수치와 이를 삼키려는 10m 괴물 파도의 충돌을 대조합니다.
-  * OCL 오프닝 시그니처 톤: "수심 30미터, 무게 1만 톤. 아파트 한 동 통째 크기의 콘크리트 덩어리가 바다 위에 떠 있습니다. 하지만 이 거대한 벽은 첫날부터 무너질 운명이었습니다." 등 묵직하고 흡인력 있는 화두를 던집니다.
-- 2단계: 해저 파괴 메커니즘 (Hydrodynamic Crisis, 장면 4~6)
-  * 단순 직립 콘크리트 벽이 맞닥뜨리는 유체역학적 극한 난관을 과학적으로 분석합니다.
-  * 파도가 벽에 부딪히는 순간 발생하는 제곱미터당 수십 톤의 충격 쇄파압, 튕겨 나간 반사파가 해저 사석 바닥을 파내어 결국 제 발밑을 무너뜨리는 세굴(Scour)과 케이슨 전도 파괴의 공포를 극명하게 해부합니다.
-- 3단계: K-토목 실증 솔루션 (K-Engineering Breakthrough, 장면 7~13)
-  * 대한민국 토목 공학자들이 찾아낸 혁신적 해법을 제시합니다.
-  * "벽으로 파도를 막는 대신, 파도가 스스로를 파괴하게 만들었습니다."라는 발상의 전환과 함께 유공 슬릿 유수실의 위상차 간섭, 벌집형 셀 구조의 하중 분산, 인터로킹 전단키와 테트라포드 연동 메커니즘을 3D 단면 투시도로 풀어냅니다.
-- 4단계: 공학적 통찰과 해양 주권 (Engineering Insight, 장면 14~16)
-  * 거친 동해와 남해의 파도를 물리법칙으로 길들여 낸 한국 해양 토목 기술의 정수를 기리며, 100년 넘게 우리 바다를 지켜내는 진정한 힘의 본질을 짚는 품격 있는 클로징으로 매듭짓습니다.
+  1. [유형 A: 연안정비사업 / 해안침식 / 백사장 복원 / 연안 보전]:
+     * ★★ 경고: 연안정비사업에는 거대 항만용 '케이슨(Caisson)'을 절대 사용하지 않습니다! 케이슨 언급 시 즉시 감점/탈락.
+     * 실제 적용 공법:
+       - **잠제 (Submerged Breakwater)**: 수면 아래 0.5~1.5m에 숨겨진 광폭 인공 리프 구조물로 파도를 미리 깨뜨려(쇄파) 해안선 침식을 방지.
+       - **양빈 (Beach Nourishment)**: 침식된 백사장에 모래를 인위적으로 공급하여 모래밭을 복원.
+       - **돌제 (Groin) & 이안제 (Detached Breakwater)**: 파도와 연안류에 의한 모래 이동(연안표사)을 가두는 차단 구조물.
+       - **친수형 호안 (Revetment)** 및 사석 완경사 피복.
+     * 핵심 수리역학: 쇄파대 파랑 에너지 감쇄, 연안표사 차단, 해빈 경사 안정화.
 
-[★ Unreal Engine 5 기반 고화질 공학 단면 투시도(Cross-section Cutaway) 시각화 규칙]:
-- 모든 "image_prompt"는 아래 요소를 필수로 조합하여 장난감 그래픽이 아닌 실제 현장 토목 단면도로 작성하세요:
-  * "An isometric 3D architectural engineering cross-section cutaway diagram of a massive modern Korean reinforced concrete caisson composite breakwater in deep ocean"
-  * "Photorealistic cross-section showing detailed soil strata, seabed rock bedding, heavy rubble mound foundation with submerged riprap gravel, and interlocking armor blocks"
-  * "Detailed perforated slit wave chambers showing water intake and internal phase-shift turbulence, or hexagonal honeycomb cell compartments with stress distribution wireframe"
-  * "Glowing red hydrodynamic wave pressure vectors, technical HUD measurement arrows, stress concentration indicators, clean engineering infographic overlay"
-  * "Dramatic cinematic lighting, Unreal Engine 5 render, Octane photorealistic, highly detailed physical concrete texture, 8k, professional documentary engineering visual, 16:9"
+  2. [유형 B: 대형 무역항 외곽시설 / 심해 방파제 (부산신항, 포항영일만, 울산신항, 사동항 등)]:
+     * 실제 적용 공법:
+       - **케이슨식 혼성제 (Caisson Composite Breakwater)**: 유공 슬릿 케이슨, 벌집형 셀, 사석 마운드, 50~80톤급 소파블록(TTP) 인터로킹 피복, 인터로킹 전단키.
+     * 핵심 수리역학: Goda 쇄파압 공식, 유수실(Chamber) 위상차 간섭 소파, 사석 마운드 세굴(Scour) 방지, 수만 톤 자중에 의한 활동/전도 저항.
+
+  3. [유형 C: 항만 준설 및 매립 / 부두 축조]:
+     * 실제 적용 공법: 호퍼 준설선(TSHD), 펌프 준설, 연약지반 개량(PBD/DCM), 안벽(Quay Wall) 케이슨.
+
+- 1단계: 압도적 현장 스케일과 물리적 위기 (장면 1~3)
+- 2단계: 파괴 메커니즘과 유체역학적 극한 한계 (장면 4~6)
+- 3단계: K-토목 실증 혁신 솔루션 (장면 7~13) - 해당 공법의 실제 단면과 시공 원리 정밀 해부
+- 4단계: 공학적 통찰과 지속가능한 해양 (장면 14~16)
+
+[★ 시각화 규칙: Unreal Engine 5 공학 단면 투시도 & 현장 조망]:
+- "image_prompt"는 장난감 모형 느낌을 철저히 배제하고, 반드시 아래 규격을 따를 것:
+  * 유형 A(연안정비): "Wide cinematic 16:9 aerial cutaway diagram of submerged reef breakwater underwater, sandy beach nourishment, riprap groin, water depth vectors, UE5 8k"
+  * 유형 B(항만 케이슨): "An isometric 3D architectural cross-section cutaway diagram of massive concrete caisson, rubble mound seabed, 500-ton crane ship alongside, workers with safety helmets, UE5 8k"
+  * 유형 C(준설): "Large industrial trailing suction hopper dredger ship in port basin, seabed dredging cutaway, muddy sediment flow vectors, UE5 8k"
 
 [나레이션 딕션]:
 - 공식 채널명: OCEAN CODE LAB (OCL)
@@ -71,6 +69,8 @@ PROMPT = """당신은 대한민국 해안·항만 토목공학의 본질을 밝�
 
 
 def generate_script(topic: str, out_dir: Path) -> dict:
+    from .cost_tracker import tracker
+    tracker.set_topic(topic)
     cfg = load_config()
     n = cfg["channel"]["scenes"]
     mins = cfg["channel"]["target_minutes"]
@@ -78,7 +78,7 @@ def generate_script(topic: str, out_dir: Path) -> dict:
         channel=cfg["channel"]["name"], persona=cfg["script"]["persona"], topic=topic,
         n_scenes=n, n_motion=cfg['video_gen']['max_scenes'], target_minutes=mins, total_chars=mins * 330,
     )
-    log.info("대본 생성 중...")
+    log.info(f"대본 생성 중 (주제: {topic})...")
     script = None
 
     # 1. Anthropic Claude (우선)
@@ -109,13 +109,13 @@ def generate_script(topic: str, out_dir: Path) -> dict:
         except Exception as ce:
             log.warning(f"Anthropic 대본 생성 예외: {ce}")
 
-    # 2. OpenAI GPT-4o / GPT-4.1 (Anthropic 없을 시 완벽 대체)
+    # 2. OpenAI GPT-4.1-mini
     if script is None:
         openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
         if openai_key:
             try:
                 from openai import OpenAI
-                log.info("OpenAI 최신 모델로 고품질 다큐 대본 생성 중...")
+                log.info("OpenAI(gpt-4.1-mini) 모델로 고품질 다큐 대본 생성 중...")
                 o_client = OpenAI(api_key=openai_key)
                 for attempt in range(3):
                     resp = o_client.chat.completions.create(
@@ -123,6 +123,9 @@ def generate_script(topic: str, out_dir: Path) -> dict:
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.7,
                     )
+                    usage = getattr(resp, "usage", None)
+                    if usage:
+                        tracker.track_openai_chat("gpt-4.1-mini", usage.prompt_tokens, usage.completion_tokens, "1차 대본 생성")
                     text = resp.choices[0].message.content.strip()
                     (out_dir / f"script_raw_{attempt}.txt").write_text(text, encoding="utf-8")
                     text = re.sub(r"^```(json)?\s*|\s*```$", "", text, flags=re.M).strip()
@@ -137,7 +140,7 @@ def generate_script(topic: str, out_dir: Path) -> dict:
             except Exception as oe2:
                 log.warning(f"OpenAI 대본 생성 실패: {oe2}")
 
-    # 3. Google Gemini (무료 티어 텍스트 모델 fallback)
+    # 3. Google Gemini
     if script is None:
         gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
         if gemini_key:
@@ -162,9 +165,7 @@ def generate_script(topic: str, out_dir: Path) -> dict:
         raise RuntimeError("대본 JSON 생성 실패 - API 키 및 로그 확인 필요")
 
     # =========================================================================
-    # [★ Ruflo Multi-Agent Swarm: 3자 교차 검증 및 비평 루프]
-    # Agent 1 (Engineering Fact Reviewer) + Agent 2 (Scale & Reality Critic) -> Agent 3 (Quality Gatekeeper Synthesizer)
-    # 목표: '장난감 수족관 블록' 느낌을 원천 차단하고 실제 한국 항만 스케일(500톤 크레인, 인부, TTP) 강제 주입
+    # [★ Ruflo Multi-Agent Swarm: 공학 팩트 고증 & 스케일 상호 교차 비평 루프]
     # =========================================================================
     try:
         openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -172,31 +173,26 @@ def generate_script(topic: str, out_dir: Path) -> dict:
             from openai import OpenAI
             r_client = OpenAI(api_key=openai_key)
             log.info("=" * 60)
-            log.info("🚀 [Ruflo Swarm] 멀티 에이전트 교차 검증 & 상호 비평 루프 가동 시작")
+            log.info("🚀 [Ruflo Swarm] 멀티 에이전트 공학 팩트 교차 검증 & 상호 비평 루프 가동")
             log.info("=" * 60)
             
             raw_scenes_json = json.dumps(script["scenes"], ensure_ascii=False)
             
-            # --- 1단계: Agent 1 (Engineering Fact Reviewer) & Agent 2 (Scale & Toy-Busting Critic) 상호 비평 ---
-            log.info("🔎 [Agent 1 & 2] 항만 토목 공학 고증 및 장난감 모형 여부 전수 비평 진행 중...")
-            critic_prompt = f"""당신은 Ruflo Swarm의 2개 전문 에이전트 팀입니다:
-- 에이전트 1 (Engineering Fact Reviewer): 대한민국 해양수산부 항만설계기준(KDS 64 10) 및 수리역학(Goda 쇄파압, 유공 소파, 사석 마운드, TTP 인터로킹) 고증 검토
-- 에이전트 2 (Scale & Anti-Toy Critic): AI가 케이슨을 '어항 속 플라스틱 장난감'이나 '작은 탁상용 모형'처럼 그리지 않도록 압도적 크기 증명 객체(Scale Reference) 감시
+            # --- 1단계: Agent 1 (공학 사실 고증관) & Agent 2 (스케일 및 실사 비평관) ---
+            log.info(f"🔎 [Agent 1 & 2] 주제 '{topic}' 공학 고증 및 장난감 모형 여부 전수 비평 진행 중...")
+            critic_prompt = f"""당신은 Ruflo Swarm의 2개 수석 에이전트 팀입니다:
+- 에이전트 1 (한국 토목공학 엄격 팩트체커):
+  * 현재 영상 주제: "{topic}"
+  * 절대 원칙: "연안정비사업 / 해안침식 / 백사장 복원" 주제인 경우, 절대로 케이슨(Caisson) 구조물이 나와선 안 됩니다!
+    연안정비사업은 잠제(Submerged breakwater), 인공리프, 양빈(모래공급), 돌제(Groin), 이안제를 다뤄야 하며, 케이슨 언급이 있으면 전부 수중 잠제/사석호안/양빈으로 즉시 교정할 것.
+  * 반대로 "심해 방파제 / 대형 무역항" 주제인 경우에만 케이슨 혼성제, TTP, 사석 마운드를 적용할 것.
+- 에이전트 2 (스케일 & 실사 비평관):
+  * AI가 어항 속 장난감 블록이나 미니어처처럼 그리지 않도록 크기 증명 객체(인간 작업자, 작업선, 크레인 등) 강제 주입.
 
-대본 제목: {script.get('title', '')}
 현재 16개 씬 프롬프트 데이터:
 {raw_scenes_json}
 
-[비평 및 교정 필수 기준]:
-1. [장난감 느낌 원천 박멸]:
-   - 10층 아파트 높이(20~30m), 수만 톤에 달하는 실제 거대함을 증명할 비교 객체가 없는 씬을 즉시 지적하고 보강해야 함.
-   - 각 프롬프트에 반드시 "500-ton floating crane ship parked alongside", "human civil engineers with safety helmets standing tiny on upper slab", "large industrial tugboat", "multi-layered 50-ton tetrapod armor" 중 1~2개 이상을 강제 배치.
-2. [실제 한국 항만 케이슨 디테일 고증]:
-   - 단순한 매끈한 회색 상자가 아니라 "weathered rough marine concrete texture with salt erosion", "perforated slit wave-dissipating chambers intake", "honeycomb cells with sand gravel infill", "heavy riprap rubble mound seabed foundation" 반영.
-3. [언리얼 5 단면 투시도(Cross-section cutaway) 원칙]:
-   - 해저 암반, 사석 마운드, 수중 구조물 내부, 수면 위 상부공까지 입체적으로 투시되는 16:9 와이드 시네마틱 구도 유지.
-
-위 기준을 바탕으로 각 씬의 image_prompt와 narration을 엄격히 상호 교차 감수한 후,
+위 기준을 바탕으로 나레이션과 image_prompt에 엉뚱한 공법이나 허위 사실이 들어가지 않도록 완벽히 교정하여,
 최종 확정된 scenes 배열(16개 씬)만 반드시 유효한 JSON 배열 형식으로 반환하세요.
 출력 형식 예시:
 [

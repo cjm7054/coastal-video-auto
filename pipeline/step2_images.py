@@ -134,6 +134,11 @@ def _openai(prompt: str, cfg: dict) -> bytes:
             )
             if r and r.data:
                 item = r.data[0]
+                try:
+                    from .cost_tracker import tracker
+                    tracker.track_openai_image(model=m, count=1)
+                except Exception:
+                    pass
                 b64 = getattr(item, "b64_json", None)
                 if b64:
                     return base64.b64decode(b64)
@@ -154,6 +159,11 @@ def _openai(prompt: str, cfg: dict) -> bytes:
             )
             if r and r.data:
                 item = r.data[0]
+                try:
+                    from .cost_tracker import tracker
+                    tracker.track_openai_image(model=dm, count=1)
+                except Exception:
+                    pass
                 b64 = getattr(item, "b64_json", None)
                 if b64:
                     return base64.b64decode(b64)

@@ -97,6 +97,11 @@ def _typecast_one(text: str, mp3: Path, cfg: dict):
         raise RuntimeError(f"Typecast API 호출 실패 ({resp.status_code}): {resp.text}")
 
     mp3.write_bytes(resp.content)
+    try:
+        from .cost_tracker import tracker
+        tracker.track_typecast(len(text), voice_name="모건")
+    except Exception:
+        pass
     
     # 균등 타임스탬프 계산 (단어 단위 자막 생성용)
     total_dur = _mp3_duration(mp3)

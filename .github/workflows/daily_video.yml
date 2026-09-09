@@ -76,6 +76,8 @@ jobs:
             output/**/thumbnail.jpg
             output/**/script.json
             output/**/subtitles.srt
+            output/**/credit_report.md
+            output/**/credit_report.json
           retention-days: 30
           if-no-files-found: ignore
 
