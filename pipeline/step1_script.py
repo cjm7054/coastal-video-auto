@@ -96,38 +96,95 @@ def generate_script(topic: str, out_dir: Path) -> dict:
     cfg = load_config()
     n = cfg["channel"]["scenes"]
     mins = cfg["channel"]["target_minutes"]
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     prompt = PROMPT.format(
         channel=cfg["channel"]["name"], persona=cfg["script"]["persona"], topic=topic,
-        n_scenes=n, n_motion=cfg['video_gen']['max_scenes'], target_minutes=mins, total_chars=mins * 330,  # 한국어 TTS 약 330자/분
+        n_scenes=n, n_motion=cfg['video_gen']['max_scenes'], target_minutes=mins, total_chars=mins * 330,
     )
     log.info("대본 생성 중...")
     script = None
-    for attempt in range(3):
-        with client.messages.stream(
-            model=cfg["script"]["model"], max_tokens=24000,
-            messages=[{"role": "user", "content": prompt}],
-        ) as stream:
-            resp = stream.get_final_message()
-        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
-        (out_dir / f"script_raw_{attempt}.txt").write_text(text, encoding="utf-8")
-        if resp.stop_reason == "max_tokens":
-            log.warning(f"대본이 잘림(시도 {attempt+1}/3) → 재시도")
-            continue
-        text = re.sub(r"^```(json)?\s*|\s*```$", "", text, flags=re.M).strip()
-        # 앞뒤에 설명 문장이 섞인 경우 첫 '{'부터 마지막 '}'까지만 사용
-        i, j = text.find("{"), text.rfind("}")
-        if i >= 0 and j > i:
-            text = text[i:j + 1]
+
+    # 1. Anthropic Claude (우선)
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if anthropic_key and not anthropic_key.startswith("sk-ant-..."):
         try:
-            script = json.loads(text)
-            break
-        except json.JSONDecodeError as e:
-            log.warning(f"JSON 파싱 실패(시도 {attempt+1}/3): {e}")
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            for attempt in range(3):
+                with client.messages.stream(
+                    model=cfg["script"]["model"], max_tokens=24000,
+                    messages=[{"role": "user", "content": prompt}],
+                ) as stream:
+                    resp = stream.get_final_message()
+                text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+                (out_dir / f"script_raw_{attempt}.txt").write_text(text, encoding="utf-8")
+                if resp.stop_reason == "max_tokens":
+                    continue
+                text = re.sub(r"^```(json)?\s*|\s*```$", "", text, flags=re.M).strip()
+                i, j = text.find("{"), text.rfind("}")
+                if i >= 0 and j > i:
+                    text = text[i:j + 1]
+                try:
+                    script = json.loads(text)
+                    break
+                except json.JSONDecodeError:
+                    pass
+        except Exception as ce:
+            log.warning(f"Anthropic 대본 생성 예외: {ce}")
+
+    # 2. OpenAI GPT-4o / GPT-4.1 (Anthropic 없을 시 완벽 대체)
     if script is None:
-        raise RuntimeError("대본 JSON 생성 3회 실패 - output 폴더의 script_raw_*.txt 확인")
+        openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if openai_key:
+            try:
+                from openai import OpenAI
+                log.info("OpenAI 최신 모델로 고품질 다큐 대본 생성 중...")
+                o_client = OpenAI(api_key=openai_key)
+                for attempt in range(3):
+                    resp = o_client.chat.completions.create(
+                        model="gpt-4.1-mini",
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.7,
+                    )
+                    text = resp.choices[0].message.content.strip()
+                    (out_dir / f"script_raw_{attempt}.txt").write_text(text, encoding="utf-8")
+                    text = re.sub(r"^```(json)?\s*|\s*```$", "", text, flags=re.M).strip()
+                    i, j = text.find("{"), text.rfind("}")
+                    if i >= 0 and j > i:
+                        text = text[i:j + 1]
+                    try:
+                        script = json.loads(text)
+                        break
+                    except json.JSONDecodeError as oe:
+                        log.warning(f"OpenAI JSON 파싱 실패({attempt+1}/3): {oe}")
+            except Exception as oe2:
+                log.warning(f"OpenAI 대본 생성 실패: {oe2}")
+
+    # 3. Google Gemini (무료 티어 텍스트 모델 fallback)
+    if script is None:
+        gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if gemini_key:
+            try:
+                from google import genai
+                log.info("Gemini Flash 모델로 고품질 다큐 대본 생성 중...")
+                g_client = genai.Client(api_key=gemini_key)
+                resp = g_client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                )
+                text = resp.text.strip()
+                text = re.sub(r"^```(json)?\s*|\s*```$", "", text, flags=re.M).strip()
+                i, j = text.find("{"), text.rfind("}")
+                if i >= 0 and j > i:
+                    text = text[i:j + 1]
+                script = json.loads(text)
+            except Exception as ge:
+                log.warning(f"Gemini 대본 생성 실패: {ge}")
+
+    if script is None:
+        raise RuntimeError("대본 JSON 생성 실패 - API 키 및 로그 확인 필요")
+
     script["topic"] = topic
     assert len(script["scenes"]) >= 3, "장면 수가 너무 적습니다"
     save_json(out_dir / "script.json", script)
     log.info(f"대본 완료: {script['title']} / 장면 {len(script['scenes'])}개")
     return script
+

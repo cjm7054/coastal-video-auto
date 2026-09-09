@@ -23,7 +23,7 @@ script:
     실제 현장 도면과 수리모형실험 검증 공법의 구조적 디테일을 정확하고 흥미진진하게 풀어낸다.
 
 images:
-  provider: "gemini"                 # gemini (Google Imagen 3/4) | openai (DALL-E 3)
+  provider: "openai"                 # gemini (Google Imagen 3/4) | openai (DALL-E 3)
   gemini_model: "imagen-3.0-generate-002"
   openai_model: "dall-e-3"
   width: 1920
