@@ -50,16 +50,17 @@ PROMPT = """당신은 대한민국 해안·항만 토목공학의 본질을 밝�
   3. [유형 C: 항만 준설 및 매립 / 부두 축조]:
      * 실제 적용 공법: 호퍼 준설선(TSHD), 펌프 준설, 연약지반 개량(PBD/DCM), 안벽(Quay Wall) 케이슨.
 
-- 1단계: 압도적 현장 스케일과 물리적 위기 (장면 1~3)
-- 2단계: 파괴 메커니즘과 유체역학적 극한 한계 (장면 4~6)
-- 3단계: K-토목 실증 혁신 솔루션 (장면 7~13) - 해당 공법의 실제 단면과 시공 원리 정밀 해부
-- 4단계: 공학적 통찰과 지속가능한 해양 (장면 14~16)
+- 1단계: 압도적 현장 스케일과 물리적 위기 (장면 1~5) - 거대한 자연 파력과 구조물의 스케일 충돌
+- 2단계: 파괴 메커니즘과 유체역학적 극한 한계 (장면 6~11) - 세굴, 전도, 쇄파압의 과학적 위기
+- 3단계: K-토목 실증 혁신 솔루션 (장면 12~21) - 해당 공법의 실제 도면, 단면 투시, 시공 메커니즘 10개 씬 정밀 해부
+- 4단계: 공학적 통찰과 지속가능한 해양 (장면 22~26) - 100년 내구성과 자연과의 공존을 담은 클로징
 
-[★ 시각화 규칙: Unreal Engine 5 공학 단면 투시도 & 현장 조망]:
-- "image_prompt"는 장난감 모형 느낌을 철저히 배제하고, 반드시 아래 규격을 따를 것:
-  * 유형 A(연안정비): "Wide cinematic 16:9 aerial cutaway diagram of submerged reef breakwater underwater, sandy beach nourishment, riprap groin, water depth vectors, UE5 8k"
-  * 유형 B(항만 케이슨): "An isometric 3D architectural cross-section cutaway diagram of massive concrete caisson, rubble mound seabed, 500-ton crane ship alongside, workers with safety helmets, UE5 8k"
-  * 유형 C(준설): "Large industrial trailing suction hopper dredger ship in port basin, seabed dredging cutaway, muddy sediment flow vectors, UE5 8k"
+[★ 신비한 건축사전식 시각화 규칙: Unreal Engine 5 공학 단면 투시도 & 다각도 컷]:
+- "image_prompt"는 장난감 모형 느낌을 철저히 배제하고, 장면마다 카메라 앵글을 다채롭게 교차할 것:
+  * [항공 조감도 (Aerial Drone 8k)]: 넓은 해역 전체와 구조물의 배치를 조망하는 광각 뷰
+  * [단면 투시도 (Cross-section Cutaway)]: 해저 지층, 사석 기초, 내부 챔버/셀 구조와 붉은 수리역학 파압 벡터 HUD 오버레이
+  * [스케일 클로즈업 (Human/Vessel Scale)]: 500톤 크레인선, 안전모를 쓴 인부, 50톤 TTP가 한눈에 보이는 실물 스케일 대비
+  * [수중 수리역학 (Underwater Hydrodynamics)]: 파도가 구조물과 충돌하며 포말과 와류를 형성하는 시뮬레이션
 
 [나레이션 딕션]:
 - 공식 채널명: OCEAN CODE LAB (OCL)
@@ -189,11 +190,11 @@ def generate_script(topic: str, out_dir: Path) -> dict:
 - 에이전트 2 (스케일 & 실사 비평관):
   * AI가 어항 속 장난감 블록이나 미니어처처럼 그리지 않도록 크기 증명 객체(인간 작업자, 작업선, 크레인 등) 강제 주입.
 
-현재 16개 씬 프롬프트 데이터:
+현재 {len(script['scenes'])}개 씬 프롬프트 데이터:
 {raw_scenes_json}
 
 위 기준을 바탕으로 나레이션과 image_prompt에 엉뚱한 공법이나 허위 사실이 들어가지 않도록 완벽히 교정하여,
-최종 확정된 scenes 배열(16개 씬)만 반드시 유효한 JSON 배열 형식으로 반환하세요.
+최종 확정된 scenes 배열({len(script['scenes'])}개 씬 전체)만 반드시 유효한 JSON 배열 형식으로 반환하세요.
 출력 형식 예시:
 [
   {{"id": 1, "narration": "...", "image_prompt": "...", "motion": false}},

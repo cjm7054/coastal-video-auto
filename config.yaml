@@ -6,8 +6,8 @@
 channel:
   name: "OCEAN CODE LAB (OCL)"       # 공식 채널명: OCEAN CODE LAB (OCL)
   language: "ko"
-  target_minutes: 2.0                # 신비한 건축사전식 압축적이고 몰입감 높은 2분 고밀도 다큐멘터리
-  scenes: 16                         # 16개 씬 (장면당 약 6~8초)의 빠른 컷 전환으로 지루할 틈 없는 신비한 건축사전 템포 구현
+  target_minutes: 3.8                # 신비한 건축사전식 정통 3.5~4.5분 롱폼 고밀도 다큐멘터리
+  scenes: 26                         # 26개 씬 (장면당 약 8초)의 다각도 컷 전환으로 지루할 틈 없는 신비한 건축사전 템포
 
 script:
   model: "claude-sonnet-4-6"
