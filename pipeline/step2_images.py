@@ -392,19 +392,23 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 except Exception as rpe:
                     log.warning(f"실사 사진 가공 실패: {rpe}")
 
-        # 4차: 앞선 장면 이미지가 있다면 시각적 일관성을 위해 직전 장면 재사용
+        # 4차: 앞선 장면 이미지가 있다면 직전 장면 재사용 (최대 1회)
         if not success:
             prev_imgs = [p for p in paths if p.name != "thumb.png" and p.exists()]
             if prev_imgs:
-                log.warning(f"이미지 {sid}: AI 모델 일시 제한으로 직전 고화질 장면({prev_imgs[-1].name}) 연속 연결")
+                log.warning(f"이미지 {sid}: 일시적 생성 지연으로 직전 장면({prev_imgs[-1].name}) 연결")
                 shutil.copy(prev_imgs[-1], out)
                 success = True
 
-        # 5차: 썸네일이거나 첫 장면인 경우에도 절대 다운되지 않도록 긴급 시네마틱 비주얼 생성
+        # 5차: 깡통 빈 화면(그라데이션) 생성 방지 - API 키 크레딧 소진 또는 차단 시 즉각 오류 발생 및 중단
         if not success:
-            log.warning(f"이미지 {sid}: 최후의 비상 시네마틱 해양 배경 생성")
-            _draw_emergency_coastal_visual(prompt, sid, W, H).save(out, "PNG")
-            success = True
+            raise RuntimeError(
+                f"[치명적 오류] 이미지 {sid} 생성 실패!\n"
+                f"원인: Google AI Studio 또는 OpenAI API 크레딧이 소진되었거나 인증이 차단되었습니다.\n"
+                f"내용 없는 빈 화면 영상이 생성되는 것을 방지하기 위해 파이프라인을 즉시 중단합니다.\n"
+                f"조치: Google AI Studio 콘솔(https://aistudio.google.com/)에서 프로젝트 크레딧을 확인/충전하시거나,\n"
+                f"사용 가능한 GEMINI_API_KEY 또는 OPENAI_API_KEY를 .env 파일에 등록해 주세요."
+            )
 
         paths.append(out)
         time.sleep(1.0)
