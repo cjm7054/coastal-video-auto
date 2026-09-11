@@ -129,13 +129,12 @@ def _openai(prompt: str, cfg: dict) -> bytes:
     
     # 1. DALL-E 3 네이티브 비율 + HD
     try:
-        log.info(f"OpenAI(dall-e-3 {dalle_size} HD natural) 호출: {clean_prompt[:70]}...")
+        log.info(f"OpenAI(dall-e-3 {dalle_size} HD) 호출: {clean_prompt[:70]}...")
         r = client.images.generate(
             model="dall-e-3",
             prompt=clean_prompt,
             size=dalle_size,
             quality="hd",
-            style="natural",
         )
         if r and r.data:
             item = r.data[0]
@@ -163,7 +162,6 @@ def _openai(prompt: str, cfg: dict) -> bytes:
             prompt=clean_prompt,
             size=fallback_size,
             quality="standard",
-            style="natural",
         )
         if r and r.data:
             item = r.data[0]
@@ -176,6 +174,41 @@ def _openai(prompt: str, cfg: dict) -> bytes:
         log.warning(f"DALL-E 3 표준 모드 실패: {de}")
 
     raise RuntimeError("OpenAI 이미지 데이터 수신 실패")
+
+
+def _draw_emergency_coastal_visual(prompt: str, sid: str | int, w: int, h: int) -> Image.Image:
+    """API 할당량 초과 비상 상황에서도 맑은 에메랄드 해안선과 방파제 윤곽의 현대적 다큐멘터리 아트워크 생성"""
+    from PIL import ImageDraw
+    im = Image.new("RGB", (w, h), color=(15, 45, 75))
+    draw = ImageDraw.Draw(im)
+
+    # 1. 하늘 그라데이션 (밝은 청명한 아침 바다 하늘)
+    sky_h = int(h * 0.42)
+    for y in range(sky_h):
+        r = int(140 - (y / sky_h) * 50)
+        g = int(195 - (y / sky_h) * 45)
+        b = int(240 - (y / sky_h) * 30)
+        draw.line([(0, y), (w, y)], fill=(r, g, b))
+
+    # 2. 에메랄드빛 푸른 바다 수면 그라데이션
+    for y in range(sky_h, h):
+        factor = (y - sky_h) / (h - sky_h)
+        r = int(10 + factor * 10)
+        g = int(115 - factor * 45)
+        b = int(160 - factor * 40)
+        draw.line([(0, y), (w, y)], fill=(r, g, b))
+
+    # 3. 수평선 파도 및 방파제 원경 실루엣
+    horizon_y = sky_h
+    draw.line([(0, horizon_y), (w, horizon_y)], fill=(230, 245, 255), width=2)
+    
+    # 방파제 콘크리트 및 테트라포드 실루엣
+    bw_y = int(h * 0.65)
+    draw.polygon([(0, h), (int(w * 0.6), h), (int(w * 0.45), bw_y), (0, int(bw_y * 1.1))], fill=(75, 85, 95))
+    draw.polygon([(0, int(bw_y * 1.1)), (int(w * 0.45), bw_y), (int(w * 0.42), int(bw_y * 0.96)), (0, int(bw_y * 1.05))], fill=(110, 120, 130))
+
+    return im
+
 
 
 def _draw_engineering_info_overlay(clean_img: Image.Image, sc: dict) -> Image.Image:
