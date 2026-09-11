@@ -51,11 +51,17 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          INPUT_FORMAT: ${{ github.event.inputs.format }}
+          INPUT_TOPIC: ${{ github.event.inputs.topic }}
         run: |
-          ARGS="--step script"
-          if [ -n "${{ github.event.inputs.format }}" ]; then ARGS="$ARGS --format ${{ github.event.inputs.format }}"; fi
-          if [ -n "${{ github.event.inputs.topic }}" ]; then ARGS="$ARGS --topic \"${{ github.event.inputs.topic }}\""; fi
-          python run.py $ARGS
+          ARGS=(--step script)
+          if [ -n "$INPUT_FORMAT" ]; then
+            ARGS+=(--format "$INPUT_FORMAT")
+          fi
+          if [ -n "$INPUT_TOPIC" ]; then
+            ARGS+=(--topic "$INPUT_TOPIC")
+          fi
+          python run.py "${ARGS[@]}"
           JOB_DIR=$(find output -maxdepth 1 -mindepth 1 -type d | sort -r | head -n 1)
           echo "job_dir=$JOB_DIR" >> $GITHUB_OUTPUT
 
