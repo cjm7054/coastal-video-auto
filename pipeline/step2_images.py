@@ -17,12 +17,49 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
     clean_prompt = prompt[:900]
     client = genai.Client(api_key=api_key)
 
-    # 1. Imagen 3.0 / 4.0 models.generate_images (Google 공식 Text-to-Image 표준 엔드포인트)
+    ar = cfg.get("images", {}).get("aspect_ratio") or ("9:16" if cfg.get("current_format") == "shorts" else "16:9")
+    # 1. Gemini 멀티모달 generate_content (gemini-2.5-flash-image / gemini-3.1-flash-image-preview)
+    multimodal_models = [
+        "gemini-2.5-flash-image",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3.1-flash-image",
+    ]
+    for fm in multimodal_models:
+        for attempt in range(2):
+            try:
+                log.info(f"Gemini({fm}, {ar}, 시도 {attempt+1}) 이미지 생성 호출: {clean_prompt[:60]}...")
+                resp = client.models.generate_content(
+                    model=fm,
+                    contents=clean_prompt,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["IMAGE"],
+                        image_config=types.ImageConfig(aspect_ratio=ar)
+                    ),
+                )
+                for part in getattr(resp, "parts", []):
+                    if hasattr(part, "as_image"):
+                        try:
+                            pil_img = part.as_image()
+                            buf = io.BytesIO()
+                            pil_img.save(buf, format="PNG")
+                            return buf.getvalue()
+                        except Exception:
+                            pass
+                    if getattr(part, "inline_data", None) and part.inline_data.data:
+                        d = part.inline_data.data
+                        return base64.b64decode(d) if isinstance(d, str) else d
+            except Exception as ferr:
+                log.warning(f"Gemini generate_content({fm}) 시도 {attempt+1} 실패: {ferr}")
+                if "429" in str(ferr) or "RESOURCE_EXHAUSTED" in str(ferr):
+                    time.sleep(3 * (attempt + 1))
+                else:
+                    break
+
+    # 2. Imagen 3.0 / 4.0 models.generate_images
     imagen_models = [
         "imagen-3.0-generate-002",
         "imagen-4.0-generate-001",
     ]
-    ar = cfg.get("images", {}).get("aspect_ratio") or ("9:16" if cfg.get("current_format") == "shorts" else "16:9")
     for m in imagen_models:
         for attempt in range(2):
             try:
@@ -53,36 +90,8 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
                 else:
                     break
 
-    # 2. Gemini 멀티모달 generate_content (gemini-2.5-flash-image)
-    multimodal_models = ["gemini-2.5-flash-image", "gemini-3.1-flash-image"]
-    for fm in multimodal_models:
-        try:
-            log.info(f"Gemini({fm}) 이미지 생성 호출: {clean_prompt[:60]}...")
-            resp = client.models.generate_content(
-                model=fm,
-                contents=clean_prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE"],
-                    image_config=types.ImageConfig(aspect_ratio=ar)
-                ),
-            )
-            for part in getattr(resp, "parts", []):
-                if hasattr(part, "as_image"):
-                    try:
-                        pil_img = part.as_image()
-                        buf = io.BytesIO()
-                        pil_img.save(buf, format="PNG")
-                        return buf.getvalue()
-                    except Exception:
-                        pass
-                if getattr(part, "inline_data", None) and part.inline_data.data:
-                    d = part.inline_data.data
-                    return base64.b64decode(d) if isinstance(d, str) else d
-        except Exception as ferr:
-            log.warning(f"Gemini generate_content({fm}) 실패: {ferr}")
-
-    # 3. Interactions API (gemini-3.1-flash-image)
-    interactions_models = ["gemini-3.1-flash-image", "gemini-3-pro-image-preview"]
+    # 3. Interactions API
+    interactions_models = ["gemini-3.1-flash-image-preview", "gemini-3.1-flash-image", "gemini-3-pro-image-preview"]
     for im in interactions_models:
         try:
             log.info(f"Interactions API({im}) 시도...")
@@ -177,6 +186,24 @@ def _openai(prompt: str, cfg: dict) -> bytes:
                     return resp.content
     except Exception as de:
         log.warning(f"DALL-E 3 표준 모드 실패: {de}")
+
+    # 3. DALL-E 2 백업 (1024x1024)
+    try:
+        log.info(f"OpenAI(dall-e-2 1024x1024) 폴백 시도...")
+        r = client.images.generate(
+            model="dall-e-2",
+            prompt=clean_prompt[:900],
+            size="1024x1024",
+        )
+        if r and r.data:
+            item = r.data[0]
+            url = getattr(item, "url", None)
+            if url:
+                resp = requests.get(url, timeout=60)
+                if resp.status_code == 200:
+                    return resp.content
+    except Exception as d2e:
+        log.warning(f"DALL-E 2 폴백 실패: {d2e}")
 
     raise RuntimeError("OpenAI 이미지 데이터 수신 실패")
 
