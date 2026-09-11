@@ -14,16 +14,30 @@ def _run(cmd):
 
 
 def _dur(path: Path) -> float:
-    out = subprocess.run(["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(path)],
-                         capture_output=True, text=True).stdout
-    return float(json.loads(out)["format"]["duration"])
+    res = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(path)],
+        capture_output=True
+    )
+    text = res.stdout.decode("utf-8", errors="ignore")
+    return float(json.loads(text)["format"]["duration"])
 
 
-def _fit_video(src: Path, out: Path, W, H, fps, slow: float):
-    """Veo 클립 → 무음, 감속, 해상도 맞춤"""
-    _run(["ffmpeg", "-y", "-i", str(src), "-an",
-          "-vf", f"setpts={1/slow:.4f}*PTS,scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},fps={fps},format=yuv420p",
-          "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(out)])
+def _fit_video(src: Path, out: Path, W: int, H: int, fps: int, target_dur: float):
+    """Google Flow 클립의 가로 세로를 9:16 또는 16:9 규격에 꽉 차게 크롭/스케일하고,
+    클립 원본 길이를 나레이션 음성 길이에 맞추어 자연스럽게 감속/가속하여 완벽하게 싱크 맞춤"""
+    orig_dur = _dur(src)
+    speed_factor = target_dur / orig_dur if orig_dur > 0 else 1.0
+    # setpts multiplier: 재생 시간 변경 (PTS * speed_factor -> 길이가 target_dur가 됨)
+    pts_mul = speed_factor
+    vf = (
+        f"setpts={pts_mul:.4f}*PTS,"
+        f"scale={W}:{H}:force_original_aspect_ratio=increase,"
+        f"crop={W}:{H},"
+        f"fps={fps},format=yuv420p"
+    )
+    _run(["ffmpeg", "-y", "-i", str(src), "-an", "-vf", vf,
+          "-t", f"{target_dur:.3f}",
+          "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(out)])
 
 
 def _last_frame(video: Path, out: Path):
@@ -47,21 +61,24 @@ def build_scene(i: int, sc: dict, out_dir: Path, tmp: Path, motion_clips: dict, 
     sid, dur = sc["id"], sc["duration"]
     img = out_dir / "images" / f"{sid}.png"
     silent = tmp / f"{sid}_v.mp4"
-    if sid in motion_clips:
-        clip = tmp / f"{sid}_veo.mp4"
-        _fit_video(motion_clips[sid], clip, W, H, fps, cfg["video_gen"]["slow_factor"])
-        cd = _dur(clip)
-        if cd >= dur:
-            _run(["ffmpeg", "-y", "-i", str(clip), "-t", f"{dur:.3f}", "-c", "copy", str(silent)])
-        else:
-            last = tmp / f"{sid}_last.png"; _last_frame(clip, last)
-            tail = tmp / f"{sid}_tail.mp4"
-            render_parallax(last, dur - cd, tail, fps=fps, mode=i % 6, strength=strength)
-            _concat([clip, tail], silent)
-        log.info(f"장면 {sid}: Veo {cd:.1f}s + 패럴랙스 {max(dur-cd,0):.1f}s")
+    
+    # Google Flow 클립 또는 Veo 모션 클립 우선 적용
+    clip_src = None
+    source_clips_dir = out_dir / "source_clips"
+    if source_clips_dir.exists():
+        cand = source_clips_dir / f"{sid}.mp4"
+        if cand.exists():
+            clip_src = cand
+    if not clip_src and sid in motion_clips and Path(motion_clips[sid]).exists():
+        clip_src = Path(motion_clips[sid])
+
+    if clip_src:
+        _fit_video(clip_src, silent, W, H, fps, dur)
+        log.info(f"장면 {sid}: Google Flow 비디오 클립 적용 ({dur:.1f}s 싱크)")
     else:
         render_parallax(img, dur, silent, fps=fps, mode=i % 6, strength=strength)
         log.info(f"장면 {sid}: 3D 시네마틱 무빙 {dur:.1f}s (모드 {i % 6})")
+
     final = tmp / f"{sid}.mp4"
     _mux_audio(silent, Path(sc["mp3"]), dur, final)
     return final
@@ -71,7 +88,8 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
     cfg = load_config()
     motion_clips = motion_clips or {}
     W, H, fps = cfg["images"]["width"], cfg["images"]["height"], cfg["video"]["fps"]
-    tmp = out_dir / "clips"; tmp.mkdir(exist_ok=True)
+    # 작업 임시 디렉토리를 temp_assemble로 분리하여 사용자 클립 보존
+    tmp = out_dir / "temp_assemble"; tmp.mkdir(exist_ok=True)
     parts = []
     for i, sc in enumerate(timeline["scenes"]):
         clip = tmp / f"{sc['id']}.mp4"
