@@ -155,9 +155,11 @@ def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
         crop_w = int(W / scale)
         crop_h = int(H / scale)
         
-        # 크롭 중심점
+        # 크롭 중심점 및 좌표 계산
         cx = cx_base + cur_dx
         cy = cy_base + cur_dy
+        x1 = max(0, min(big_w - crop_w, int(cx - crop_w / 2)))
+        y1 = max(0, min(big_h - crop_h, int(cy - crop_h / 2)))
         
         # MD Stage 6 규격: 0.0~0.5초 순수 CLEAN 유지 후, 0.5~2.2초에 걸쳐 INFO 레이어(치수, 지시선, 화살표)가 부드럽게 페이드인 안착
         current_time = t * duration
