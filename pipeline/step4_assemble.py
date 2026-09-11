@@ -95,8 +95,9 @@ def build_scene(i: int, sc: dict, out_dir: Path, tmp: Path, motion_clips: dict, 
         _fit_video(clip_src, silent, W, H, fps, dur)
         log.info(f"장면 {sid}: Google Flow / Veo 비디오 클립 적용 ({clip_src.name}, {dur:.1f}s 싱크)")
     else:
-        render_parallax(src_clean_path, dur, silent, fps=fps, mode=i % 6, strength=strength, info_img_path=src_info_path)
-        log.info(f"장면 {sid}: 3D CLEAN-to-INFO 공학 모션 렌더 {dur:.1f}s (모드 {i % 6})")
+        render_parallax(src_clean_path, dur, silent, fps=fps, mode=i % 6, strength=strength, info_img_path=src_info_path, target_w=W, target_h=H)
+        log.info(f"장면 {sid}: 3D CLEAN-to-INFO 공학 모션 렌더 {dur:.1f}s ({W}x{H}, 모드 {i % 6})")
+
 
     final = tmp / f"{sid}.mp4"
     _mux_audio(silent, Path(sc["mp3"]), dur, final)
@@ -173,8 +174,9 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
         render_dust(min(total, 40), W, H, tmp / "dust.mp4", fps=fps)
         inputs += ["-stream_loop", "-1", "-i", "dust.mp4"]
         fc.append(f"[1:v]scale={W}:{H},lutyuv=y='val*{dust_op:.3f}',format=gbrp[d];"
-                  f"{vin}format=gbrp[base];[base][d]blend=all_mode=screen:shortest=1,format=yuv420p[vd]")
+                  f"{vin}scale={W}:{H},format=gbrp[base];[base][d]blend=all_mode=screen:shortest=1,format=yuv420p[vd]")
         vin = "[vd]"
+
     bgms = list((ROOT / cfg["video"]["bgm_dir"]).glob("*.mp3"))
     amap = ["-map", "0:a"]
     if bgms:

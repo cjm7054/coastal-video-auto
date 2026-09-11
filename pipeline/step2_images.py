@@ -467,9 +467,16 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
         if not success:
             raise RuntimeError(f"장면 {sid} 이미지 생성 실패: AI(Google Imagen / Gemini / DALL-E) 호출이 실패하였으며 로컬 템플릿이 없습니다. 유치한 2D 그림은 생성하지 않고 중단합니다.")
 
+        # 이미지 크기를 설정된 W, H로 정확하게 리사이즈/크롭 보증 (렌더러/블렌드 필터 규격 일치)
+        if clean_pil.size != (W, H):
+            ratio = max(W / clean_pil.width, H / clean_pil.height)
+            clean_pil = clean_pil.resize((round(clean_pil.width * ratio), round(clean_pil.height * ratio)), Image.LANCZOS)
+            l, t = (clean_pil.width - W) // 2, (clean_pil.height - H) // 2
+            clean_pil = clean_pil.crop((l, t, l + W, t + H))
 
         # CLEAN 이미지 저장
         clean_pil.save(out_clean, "PNG")
+
 
         # INFO 이미지 제작: MD Stage 4 규격에 맞춰 3D 치수선, 수치, 라벨, 하중 화살표 정밀 증강
         if sid == "thumb":

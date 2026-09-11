@@ -51,7 +51,8 @@ def render_dust(duration: float, W: int, H: int, out: Path, fps=24, n=110, seed=
 
 
 def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
-                    strength=0.08, info_img_path: Path | None = None):
+                    strength=0.08, info_img_path: Path | None = None,
+                    target_w: int | None = None, target_h: int | None = None):
     """신비한 건축사전식 고화질 시네마틱 3D 카메라 워킹 엔진 (GPU 불필요, 비용 0원).
     - MD Stage 6 규격 지원: CLEAN 실사 이미지에서 시작하여 0.4초 이후 3D 지시선, 치수, 하중 화살표(INFO)가 유려하게 떠오르는 트랜지션 연출
     - Mode 0: [360도 오비탈 회전 드론 뷰 (360° Orbital Drone View)]
@@ -63,13 +64,21 @@ def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
     """
     import cv2
     clean_img = Image.open(img_path).convert("RGB")
-    W, H = clean_img.size
+    W = target_w or clean_img.width
+    H = target_h or clean_img.height
+
+    if clean_img.size != (W, H):
+        ratio = max(W / clean_img.width, H / clean_img.height)
+        clean_img = clean_img.resize((round(clean_img.width * ratio), round(clean_img.height * ratio)), Image.LANCZOS)
+        l, t = (clean_img.width - W) // 2, (clean_img.height - H) // 2
+        clean_img = clean_img.crop((l, t, l + W, t + H))
     
     # 회전 및 고배율 무빙 시 여백이 보이지 않도록 캔버스를 1.75배로 충분히 확장
     pad = 1.75
     big_w, big_h = int(W * pad), int(H * pad)
     big_clean = clean_img.resize((big_w, big_h), Image.LANCZOS)
     src_clean = np.array(big_clean)[:, :, ::-1]  # BGR for OpenCV
+
     
     # INFO 타겟 이미지가 있을 경우 동일 캔버스로 준비
     src_info = None
