@@ -179,6 +179,108 @@ def _calculate_word_timestamps(text: str, mp3: Path):
     return words
 
 
+def _synthesize_brand_isolated(display_text: str, mp3: Path, prov: str, cfg: dict):
+    """'OCEAN CODE LAB' 채널 브랜딩을 단독으로 분리하여,
+    앞뒤 문장과 뚜렷한 침묵(휴지기 0.45초)을 두고 단독 발음되도록 합성하고,
+    자막에는 'OCEAN CODE LAB'으로 독립 표기되도록 타임스탬프 큐를 반환한다."""
+    import subprocess
+    m = re.search(r'^(.*?)(?:[\.\,\!\?\—\-\s]*)(OCEAN CODE LAB|오션 코드 랩)(?:[\.\,\!\?\—\-\s]*)(.*)$', display_text, flags=re.IGNORECASE)
+    if not m:
+        return None
+
+    p1 = m.group(1).strip()
+    brand_sub = "OCEAN CODE LAB"
+    brand_spoken = "오션 코드 랩."
+    p3 = m.group(3).strip()
+
+    temp_p1 = mp3.with_name(f"{mp3.stem}_temp_p1.mp3")
+    temp_brand = mp3.with_name(f"{mp3.stem}_temp_brand.mp3")
+    temp_p3 = mp3.with_name(f"{mp3.stem}_temp_p3.mp3")
+
+    try:
+        def _synth_part(txt, part_mp3):
+            norm_txt = _normalize_for_tts(txt)
+            if prov == "typecast":
+                try:
+                    return _typecast_one(norm_txt, part_mp3, cfg)
+                except Exception:
+                    return asyncio.run(_edge_one(norm_txt, part_mp3, cfg["tts"]["edge_voice"], cfg["tts"]["rate"]))
+            elif prov == "elevenlabs":
+                return _elevenlabs_one(norm_txt, part_mp3, cfg)
+            else:
+                return asyncio.run(_edge_one(norm_txt, part_mp3, cfg["tts"]["edge_voice"], cfg["tts"]["rate"]))
+
+        w1 = _synth_part(p1, temp_p1) if p1 else []
+        wb = _synth_part(brand_spoken, temp_brand)
+        w3 = _synth_part(p3, temp_p3) if p3 else []
+
+        dur1 = _mp3_duration(temp_p1) if p1 and temp_p1.exists() else 0.0
+        durb = _mp3_duration(temp_brand) if temp_brand.exists() else 1.0
+        dur3 = _mp3_duration(temp_p3) if p3 and temp_p3.exists() else 0.0
+        gap = 0.45  # 귀에 확 들어오도록 단독으로 띄워주는 앞뒤 침묵(Pause)
+
+        # ffmpeg로 part1 + gap + brand + gap + part3 연결
+        inputs = []
+        filter_parts = []
+        concat_inputs = []
+
+        idx_in = 0
+        if p1 and dur1 > 0:
+            inputs.extend(["-i", str(temp_p1)])
+            concat_inputs.append(f"[{idx_in}:a]")
+            idx_in += 1
+            filter_parts.append(f"anullsrc=r=44100:cl=mono,atrim=end={gap}[s1];")
+            concat_inputs.append("[s1]")
+
+        inputs.extend(["-i", str(temp_brand)])
+        concat_inputs.append(f"[{idx_in}:a]")
+        idx_in += 1
+
+        if p3 and dur3 > 0:
+            filter_parts.append(f"anullsrc=r=44100:cl=mono,atrim=end={gap}[s2];")
+            concat_inputs.append("[s2]")
+            inputs.extend(["-i", str(temp_p3)])
+            concat_inputs.append(f"[{idx_in}:a]")
+            idx_in += 1
+
+        filter_complex = "".join(filter_parts) + "".join(concat_inputs) + f"concat=n={len(concat_inputs)}:v=0:a=1[a]"
+        cmd = ["ffmpeg", "-y"] + inputs + ["-filter_complex", filter_complex, "-map", "[a]", str(mp3)]
+        res = subprocess.run(cmd, capture_output=True)
+        if res.returncode != 0:
+            raise RuntimeError(f"브랜드 음성 연결 실패: {res.stderr.decode('utf-8', errors='ignore')}")
+
+        # 정밀 자막 큐 생성 (OCEAN CODE LAB은 단독 줄로 선명히 표기)
+        cues = []
+        cur_t = 0.0
+        if p1 and dur1 > 0:
+            # part1 단어 타임스탬프 반영
+            if w1:
+                for s, e, txt in _words_to_cues(w1):
+                    cues.append((cur_t + s, cur_t + e, txt))
+            else:
+                cues.append((cur_t, cur_t + dur1, p1))
+            cur_t += dur1 + gap
+
+        # OCEAN CODE LAB 단독 표기
+        cues.append((cur_t, cur_t + durb, brand_sub))
+        cur_t += durb
+
+        if p3 and dur3 > 0:
+            cur_t += gap
+            if w3:
+                for s, e, txt in _words_to_cues(w3):
+                    cues.append((cur_t + s, cur_t + e, txt))
+            else:
+                cues.append((cur_t, cur_t + dur3, p3))
+
+        return cues
+    finally:
+        for p in [temp_p1, temp_brand, temp_p3]:
+            if p.exists():
+                try: p.unlink()
+                except Exception: pass
+
+
 def generate_audio(script: dict, out_dir: Path) -> dict:
     cfg = load_config()
     prov = cfg["tts"].get("provider", "typecast")
@@ -187,8 +289,24 @@ def generate_audio(script: dict, out_dir: Path) -> dict:
         mp3 = out_dir / "audio" / f"{sc['id']}.mp3"
         display_text = sc["narration"]
         spoken_text = _normalize_for_tts(display_text)
-        words = None
         
+        # 'OCEAN CODE LAB' 브랜딩이 포함된 장면인 경우, 앞뒤 문장과 분리하여 단독 발음 및 영문 자막 처리
+        if "OCEAN CODE LAB" in display_text.upper() or "오션 코드 랩" in display_text:
+            log.info(f"✨ 장면 {sc['id']}: OCEAN CODE LAB 브랜드 단독 강조 및 일시정지(Pause) 분리 합성 중...")
+            try:
+                cues = _synthesize_brand_isolated(display_text, mp3, prov, cfg)
+                dur = _mp3_duration(mp3) + 0.4
+                for s, e, w in cues:
+                    srt_lines.append(f"{idx}\n{_fmt(t0 + s)} --> {_fmt(t0 + e)}\n{w}\n")
+                    idx += 1
+                timeline.append({"id": sc["id"], "mp3": str(mp3), "start": t0, "duration": dur})
+                log.info(f"TTS {sc['id']} (브랜드 분리 완료): {dur:.1f}s")
+                t0 += dur
+                continue
+            except Exception as be:
+                log.warning(f"브랜드 단독 분리 합성 실패 ({be}) → 일반 파이프라인 진행")
+
+        words = None
         if prov == "typecast":
             try:
                 log.info(f"타입캐스트 모건 보이스 합성 중: 장면 {sc['id']} (발음 정제: {spoken_text[:40]}...)...")
@@ -210,3 +328,4 @@ def generate_audio(script: dict, out_dir: Path) -> dict:
     (out_dir / "subtitles.srt").write_text("\n".join(srt_lines), encoding="utf-8")
     log.info(f"총 길이 {t0/60:.1f}분")
     return {"scenes": timeline, "total": t0}
+
