@@ -343,6 +343,7 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
     cfg = load_config()
     W, H = cfg["images"]["width"], cfg["images"]["height"]
     provider = cfg.get("images", {}).get("provider", "openai")
+    (out_dir / "images").mkdir(parents=True, exist_ok=True)
     
     # 1. API 키 가용성에 따른 최적 엔진 매핑 (OpenAI DALL-E 3 우선)
     generators = []

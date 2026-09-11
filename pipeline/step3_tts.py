@@ -284,9 +284,11 @@ def _synthesize_brand_isolated(display_text: str, mp3: Path, prov: str, cfg: dic
 def generate_audio(script: dict, out_dir: Path) -> dict:
     cfg = load_config()
     prov = cfg["tts"].get("provider", "typecast")
+    audio_dir = out_dir / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
     timeline, t0, srt_lines, idx = [], 0.0, [], 1
     for sc in script["scenes"]:
-        mp3 = out_dir / "audio" / f"{sc['id']}.mp3"
+        mp3 = audio_dir / f"{sc['id']}.mp3"
         display_text = sc["narration"]
         spoken_text = _normalize_for_tts(display_text)
         
