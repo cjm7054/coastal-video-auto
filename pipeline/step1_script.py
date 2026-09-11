@@ -171,20 +171,25 @@ def generate_script(topic: str, out_dir: Path) -> dict:
         if gemini_key:
             try:
                 from google import genai
-                log.info("Gemini Flash 모델로 고품질 다큐 대본 생성 중...")
+                log.info("Gemini Flash(gemini-3.6-flash) 모델로 대본 생성 시도...")
                 g_client = genai.Client(api_key=gemini_key)
                 resp = g_client.models.generate_content(
                     model="gemini-3.6-flash",
                     contents=prompt,
                 )
                 text = resp.text.strip()
-                text = re.sub(r"^```(json)?\s*|\s*```$", "", text, flags=re.M).strip()
+                (out_dir / "script_raw_gemini.txt").write_text(text, encoding="utf-8")
+                # 마크다운 코드블록 정제
+                text = re.sub(r"^```[a-zA-Z]*\s*|\s*```$", "", text, flags=re.M).strip()
                 i, j = text.find("{"), text.rfind("}")
                 if i >= 0 and j > i:
                     text = text[i:j + 1]
                 script = json.loads(text)
+                log.info("✅ Gemini Flash 모델로 대본 생성 성공!")
             except Exception as ge:
                 log.warning(f"Gemini 대본 생성 실패: {ge}")
+                import traceback
+                traceback.print_exc()
 
     if script is None:
         raise RuntimeError("대본 JSON 생성 실패 - API 키 및 로그 확인 필요")

@@ -55,8 +55,7 @@ jobs:
           ARGS="--step script"
           if [ -n "${{ github.event.inputs.format }}" ]; then ARGS="$ARGS --format ${{ github.event.inputs.format }}"; fi
           if [ -n "${{ github.event.inputs.topic }}" ]; then ARGS="$ARGS --topic \"${{ github.event.inputs.topic }}\""; fi
-          OUTPUT=$(python run.py $ARGS)
-          echo "$OUTPUT"
+          python run.py $ARGS
           JOB_DIR=$(find output -maxdepth 1 -mindepth 1 -type d | sort -r | head -n 1)
           echo "job_dir=$JOB_DIR" >> $GITHUB_OUTPUT
 
