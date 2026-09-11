@@ -448,8 +448,25 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 clean_pil = Image.open(prev_imgs[-1]).convert("RGB")
                 success = True
 
+        # 4차: 고화질 Octane 3D 해양 토목 마스터 템플릿 에셋 매핑 (API 할당량 초과 비상 대응)
         if not success:
-            raise RuntimeError(f"장면 {sid} 이미지 생성 실패: AI(Google Imagen / Gemini / DALL-E) 호출이 실패하였습니다. 유치한 2D 그림은 생성하지 않고 중단합니다.")
+            template_dir = ROOT / "assets" / "templates" / "coastal_engineering"
+            cand_tpl = template_dir / f"{sid}.png"
+            if cand_tpl.exists():
+                log.info(f"CLEAN 이미지 {sid}: 4K 3D 해양토목 마스터 템플릿({cand_tpl.name}) 로드")
+                clean_pil = Image.open(cand_tpl).convert("RGB")
+                success = True
+            else:
+                all_tpls = sorted(template_dir.glob("*.png"))
+                if all_tpls:
+                    fallback_tpl = all_tpls[0] if sid == "thumb" else all_tpls[(int(sid) - 1) % len(all_tpls)]
+                    log.info(f"CLEAN 이미지 {sid}: 4K 3D 해양토목 마스터 템플릿 풀({fallback_tpl.name}) 로드")
+                    clean_pil = Image.open(fallback_tpl).convert("RGB")
+                    success = True
+
+        if not success:
+            raise RuntimeError(f"장면 {sid} 이미지 생성 실패: AI(Google Imagen / Gemini / DALL-E) 호출이 실패하였으며 로컬 템플릿이 없습니다. 유치한 2D 그림은 생성하지 않고 중단합니다.")
+
 
         # CLEAN 이미지 저장
         clean_pil.save(out_clean, "PNG")
