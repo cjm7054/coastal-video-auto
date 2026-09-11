@@ -126,7 +126,7 @@ def _openai(prompt: str, cfg: dict) -> bytes:
     # DALL-E 3 전용 클린 프롬프트 (군더더기 없는 800자 제한)
     clean_prompt = prompt[:950]
     
-    dalle_size = cfg["images"].get("dalle_size", "1792x1024")
+    dalle_size = cfg.get("images", {}).get("dalle_size") or ("1024x1792" if cfg.get("current_format") == "shorts" else "1792x1024")
     
     # 1. DALL-E 3 네이티브 비율 (1792x1024 or 1024x1792) + 자연스러운 다큐멘터리 스타일(natural) + HD 퀄리티
     try:
@@ -154,14 +154,15 @@ def _openai(prompt: str, cfg: dict) -> bytes:
                 if resp.status_code == 200:
                     return resp.content
     except Exception as me:
-        log.warning(f"DALL-E 3 1792x1024 HD 생성 실패: {me} → 표준 모드로 재시도")
+        log.warning(f"DALL-E 3 {dalle_size} HD 생성 실패: {me} → 표준 모드로 재시도")
 
-    # 2. DALL-E 3 표준 1024x1024 백업
+    # 2. DALL-E 3 표준 백업 (쇼츠면 1024x1792 standard, 롱폼이면 1024x1024)
     try:
+        fallback_size = dalle_size if dalle_size in ["1024x1792", "1792x1024"] else "1024x1024"
         r = client.images.generate(
             model="dall-e-3",
             prompt=clean_prompt,
-            size="1024x1024",
+            size=fallback_size,
             quality="standard",
             style="natural",
         )
@@ -341,16 +342,16 @@ def _draw_emergency_coastal_visual(prompt: str, sid: str | int, w: int, h: int) 
 def generate_images(script: dict, out_dir: Path) -> list[Path]:
     cfg = load_config()
     W, H = cfg["images"]["width"], cfg["images"]["height"]
-    provider = cfg["images"].get("provider", "openai")
+    provider = cfg.get("images", {}).get("provider", "openai")
     
-    # 1. API 키 가용성에 따른 최적 엔진 매핑
+    # 1. API 키 가용성에 따른 최적 엔진 매핑 (OpenAI DALL-E 3 우선)
     generators = []
     if provider == "openai":
         generators = [("OpenAI DALL-E", _openai), ("Google Imagen/Gemini", _gemini)]
     elif provider == "gemini":
         generators = [("Google Imagen/Gemini", _gemini), ("OpenAI DALL-E", _openai)]
     else:
-        generators = [("Google Imagen/Gemini", _gemini), ("OpenAI DALL-E", _openai)]
+        generators = [("OpenAI DALL-E", _openai), ("Google Imagen/Gemini", _gemini)]
 
     suffix = cfg["images"]["style_suffix"].strip()
     paths = []
