@@ -4,6 +4,37 @@ import asyncio, os, re
 from pathlib import Path
 from .common import load_config, log
 
+# 영문 단어 및 전문 약어가 TTS에서 알파벳 철자(스펠링)로 읽히지 않고 자연스러운 한국어로 발음되도록 치환
+PHONETIC_MAP = {
+    "OCEAN CODE LAB": "오션 코드 랩",
+    "OCEAN": "오션",
+    "CODE": "코드",
+    "LAB": "랩",
+    "KDS": "케이디에스",
+    "TTP": "티티피",
+    "TSHD": "호퍼 준설선",
+    "PBD": "피비디",
+    "DCM": "디씨엠",
+    "AI": "에이아이",
+    "GPS": "지피에스",
+    "HUD": "에이치유디",
+    "3D": "쓰리디",
+    "2D": "투디",
+    "4K": "포케이",
+    "8K": "에이트케이",
+    "HD": "에이치디",
+}
+
+
+def _normalize_for_tts(text: str) -> str:
+    """TTS 엔진에 전달하기 전 영문 고유명사 및 약어를 자연스러운 한글 발음으로 변환"""
+    out = text
+    for eng, kor in PHONETIC_MAP.items():
+        out = re.sub(r"\b" + re.escape(eng) + r"\b", kor, out, flags=re.IGNORECASE)
+    # 문장 부호 중 TTS에서 불필요한 멈춤이나 이상 발음을 유발하는 기호 정제
+    out = out.replace("—", " ").replace("-", " ")
+    return re.sub(r"\s+", " ", out).strip()
+
 
 def _fmt(t: float) -> str:
     h, r = divmod(t, 3600); m, s = divmod(r, 60)
@@ -154,20 +185,21 @@ def generate_audio(script: dict, out_dir: Path) -> dict:
     timeline, t0, srt_lines, idx = [], 0.0, [], 1
     for sc in script["scenes"]:
         mp3 = out_dir / "audio" / f"{sc['id']}.mp3"
-        text = sc["narration"]
+        display_text = sc["narration"]
+        spoken_text = _normalize_for_tts(display_text)
         words = None
         
         if prov == "typecast":
             try:
-                log.info(f"타입캐스트 모건 보이스 합성 중: 장면 {sc['id']}...")
-                words = _typecast_one(text, mp3, cfg)
+                log.info(f"타입캐스트 모건 보이스 합성 중: 장면 {sc['id']} (발음 정제: {spoken_text[:40]}...)...")
+                words = _typecast_one(spoken_text, mp3, cfg)
             except Exception as te:
                 log.warning(f"타입캐스트 합성 실패 ({te}) → Edge-TTS 자동 대체")
-                words = asyncio.run(_edge_one(text, mp3, cfg["tts"]["edge_voice"], cfg["tts"]["rate"]))
+                words = asyncio.run(_edge_one(spoken_text, mp3, cfg["tts"]["edge_voice"], cfg["tts"]["rate"]))
         elif prov == "elevenlabs":
-            words = _elevenlabs_one(text, mp3, cfg)
+            words = _elevenlabs_one(spoken_text, mp3, cfg)
         else:
-            words = asyncio.run(_edge_one(text, mp3, cfg["tts"]["edge_voice"], cfg["tts"]["rate"]))
+            words = asyncio.run(_edge_one(spoken_text, mp3, cfg["tts"]["edge_voice"], cfg["tts"]["rate"]))
 
         dur = _mp3_duration(mp3) + 0.4  # 장면 사이 0.4초 여유
         for s, e, w in _words_to_cues(words):
