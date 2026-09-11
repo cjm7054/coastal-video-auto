@@ -36,7 +36,13 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
                         image_config=types.ImageConfig(aspect_ratio=ar)
                     ),
                 )
-                for part in getattr(resp, "parts", []):
+                # parts 탐색: resp.parts 및 resp.candidates[0].content.parts
+                parts_to_check = list(getattr(resp, "parts", []) or [])
+                if not parts_to_check and getattr(resp, "candidates", None):
+                    for cand in resp.candidates:
+                        if getattr(cand, "content", None) and getattr(cand.content, "parts", None):
+                            parts_to_check.extend(cand.content.parts)
+                for part in parts_to_check:
                     if hasattr(part, "as_image"):
                         try:
                             pil_img = part.as_image()
@@ -45,13 +51,14 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
                             return buf.getvalue()
                         except Exception:
                             pass
-                    if getattr(part, "inline_data", None) and part.inline_data.data:
-                        d = part.inline_data.data
+                    inline_d = getattr(part, "inline_data", None)
+                    if inline_d and getattr(inline_d, "data", None):
+                        d = inline_d.data
                         return base64.b64decode(d) if isinstance(d, str) else d
             except Exception as ferr:
                 log.warning(f"Gemini generate_content({fm}) 시도 {attempt+1} 실패: {ferr}")
                 if "429" in str(ferr) or "RESOURCE_EXHAUSTED" in str(ferr):
-                    time.sleep(3 * (attempt + 1))
+                    time.sleep(4 * (attempt + 1))
                 else:
                     break
 
