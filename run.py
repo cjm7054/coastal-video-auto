@@ -146,7 +146,7 @@ def main():
     except Exception as te:
         log.warning(f"크레딧 결산 기록 실패: {te}")
 
-    if a.no_upload or a.step != "all":
+    if a.no_upload or (a.step != "all" and a.step != "upload"):
         log.info(f"작업 완료 → {job}")
         return
     url = upload(script, video, thumb)
