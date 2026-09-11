@@ -24,32 +24,37 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
     ]
     ar = cfg.get("images", {}).get("aspect_ratio") or ("9:16" if cfg.get("current_format") == "shorts" else "16:9")
     for m in imagen_models:
-        try:
-            log.info(f"Google Imagen({m}, {ar}) 시도...")
-            resp = client.models.generate_images(
-                model=m,
-                prompt=clean_prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    aspect_ratio=ar,
-                    output_mime_type="image/jpeg",
-                ),
-            )
-            if resp and resp.generated_images:
-                img_wrapper = resp.generated_images[0]
-                img_obj = getattr(img_wrapper, "image", img_wrapper)
-                raw = getattr(img_obj, "image_bytes", None) or getattr(img_obj, "_image_bytes", None)
-                if raw:
-                    return base64.b64decode(raw) if isinstance(raw, str) else raw
-                if hasattr(img_obj, "save"):
-                    buf = io.BytesIO()
-                    img_obj.save(buf, format="JPEG")
-                    return buf.getvalue()
-        except Exception as err:
-            log.warning(f"Google Imagen({m}) 시도 실패: {err}")
+        for attempt in range(2):
+            try:
+                log.info(f"Google Imagen({m}, {ar}, 시도 {attempt+1}) 호출...")
+                resp = client.models.generate_images(
+                    model=m,
+                    prompt=clean_prompt,
+                    config=types.GenerateImagesConfig(
+                        number_of_images=1,
+                        aspect_ratio=ar,
+                        output_mime_type="image/jpeg",
+                    ),
+                )
+                if resp and resp.generated_images:
+                    img_wrapper = resp.generated_images[0]
+                    img_obj = getattr(img_wrapper, "image", img_wrapper)
+                    raw = getattr(img_obj, "image_bytes", None) or getattr(img_obj, "_image_bytes", None)
+                    if raw:
+                        return base64.b64decode(raw) if isinstance(raw, str) else raw
+                    if hasattr(img_obj, "save"):
+                        buf = io.BytesIO()
+                        img_obj.save(buf, format="JPEG")
+                        return buf.getvalue()
+            except Exception as err:
+                log.warning(f"Google Imagen({m}) 실패 ({err})")
+                if "429" in str(err) or "RESOURCE_EXHAUSTED" in str(err):
+                    time.sleep(3 * (attempt + 1))
+                else:
+                    break
 
-    # 2. Gemini 멀티모달 generate_content (IMAGE 모달리티 백업)
-    multimodal_models = ["gemini-3.1-flash-image", "gemini-2.5-flash-image"]
+    # 2. Gemini 멀티모달 generate_content (gemini-2.5-flash-image)
+    multimodal_models = ["gemini-2.5-flash-image", "gemini-3.1-flash-image"]
     for fm in multimodal_models:
         try:
             log.info(f"Gemini({fm}) 이미지 생성 호출: {clean_prompt[:60]}...")
@@ -176,6 +181,14 @@ def _openai(prompt: str, cfg: dict) -> bytes:
     raise RuntimeError("OpenAI 이미지 데이터 수신 실패")
 
 
+def _fit(data: bytes, w: int, h: int) -> Image.Image:
+    im = Image.open(io.BytesIO(data)).convert("RGB")
+    ratio = max(w / im.width, h / im.height)
+    im = im.resize((round(im.width * ratio), round(im.height * ratio)), Image.LANCZOS)
+    left, top = (im.width - w) // 2, (im.height - h) // 2
+    return im.crop((left, top, left + w, top + h))
+
+
 def _draw_emergency_coastal_visual(prompt: str, sid: str | int, w: int, h: int) -> Image.Image:
     """API 할당량 초과 비상 상황에서도 맑은 에메랄드 해안선과 방파제 윤곽의 현대적 다큐멘터리 아트워크 생성"""
     from PIL import ImageDraw
@@ -210,9 +223,13 @@ def _draw_emergency_coastal_visual(prompt: str, sid: str | int, w: int, h: int) 
     return im
 
 
-
 def _draw_engineering_info_overlay(clean_img: Image.Image, sc: dict) -> Image.Image:
-    """MD 규격 Stage 4 (INFO): CLEAN 이미지 위에 3D 원근 투시 지시선, 한국어 공학 치수/수치 박스, 파랑 및 하중 벡터 화살표를 정밀 합성"""
+    """MD 규격 Stage 4 (INFO) & 신비한 건축사전 레퍼런스 스타일:
+    - 절대 금지(Forbidden): 화면을 뒤덮는 거대한 사각 박스, 전체 화면 플랫 HUD
+    - 준수(Standard): 얇은 1~2px 시안/골드 헤어라인 지시선, 미세 앵커 닷(r=3~4px),
+      작고 정제된 기술 라벨(18~22px) 및 핵심 수치 배지만 배치
+    - 안전 영역: 상단 20%~하단 65% 내부로 제한하여 쇼츠 자막 및 상단 상태바 침범 완전 차단
+    """
     from PIL import ImageDraw, ImageFont
     
     info_img = clean_img.copy()
@@ -222,8 +239,9 @@ def _draw_engineering_info_overlay(clean_img: Image.Image, sc: dict) -> Image.Im
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
     
-    # 폰트 로드 (기본 맑은 고딕 또는 대체 폰트)
-    font_large, font_small, font_title = None, None, None
+    # 정밀 폰트 로드 (모바일 쇼츠 가독성을 고려한 절제된 폰트 크기)
+    font_val = None
+    font_label = None
     font_candidates = [
         "c:/Windows/Fonts/malgunbd.ttf",
         "c:/Windows/Fonts/malgun.ttf",
@@ -233,114 +251,94 @@ def _draw_engineering_info_overlay(clean_img: Image.Image, sc: dict) -> Image.Im
     for fc in font_candidates:
         if os.path.exists(fc):
             try:
-                font_large = ImageFont.truetype(fc, int(W * 0.038))
-                font_small = ImageFont.truetype(fc, int(W * 0.026))
-                font_title = ImageFont.truetype(fc, int(W * 0.044))
+                font_val = ImageFont.truetype(fc, int(W * 0.024))      # 약 26px (단정하고 날렵한 수치)
+                font_label = ImageFont.truetype(fc, int(W * 0.018))    # 약 19px (극도로 정제된 라벨)
                 break
             except Exception:
                 continue
-    if font_large is None:
-        font_large = ImageFont.load_default()
-        font_small = font_large
-        font_title = font_large
+    if font_val is None:
+        font_val = ImageFont.load_default()
+        font_label = font_val
 
     narration = sc.get("narration", "")
     sid = sc.get("id", 1)
     
-    # 1. 기술 데이터베이스 및 치수 도출
-    tech_tags = []
-    vectors = []
+    # 1. 기술 데이터베이스 및 치수 도출 (MD 규격: 씬당 1~2개의 미세 지시선만 허용)
+    callouts = []
+    vector_arrows = []
     
+    # 쇼츠 세로 안전 영역 (X: 10%~90%, Y: 22%~62%)
     if any(k in narration for k in ["잠제", "수중", "보이지 않", "물속"]):
-        tech_tags.append(("수중방파제 (잠제)", "마루수심 -0.5m ~ -1.5m", int(W * 0.12), int(H * 0.46)))
-        tech_tags.append(("파랑 에너지 소파", "쇄파 감쇄율 70% 이상", int(W * 0.52), int(H * 0.35)))
-        vectors.append(((int(W * 0.85), int(H * 0.38)), (int(W * 0.55), int(H * 0.45)), "파랑 내습 에너지", (0, 210, 255)))
+        callouts.append(("마루수심", "-0.5m ~ -1.5m", int(W * 0.22), int(H * 0.42), int(W * 0.45), int(H * 0.50)))
+        vector_arrows.append(((int(W * 0.78), int(H * 0.36)), (int(W * 0.50), int(H * 0.40)), "쇄파 감쇄 70%", (0, 220, 255)))
     elif any(k in narration for k in ["양빈", "모래", "백사장", "침식"]):
-        tech_tags.append(("인공 양빈 공법", "모래 보충 체적 100,000㎥", int(W * 0.10), int(H * 0.50)))
-        tech_tags.append(("연안표사 차단", "해빈 경사 1:50 안정화", int(W * 0.50), int(H * 0.38)))
-        vectors.append(((int(W * 0.20), int(H * 0.65)), (int(W * 0.60), int(H * 0.60)), "연안표사 이동 벡터", (255, 215, 0)))
+        callouts.append(("양빈 체적", "100,000㎥", int(W * 0.22), int(H * 0.45), int(W * 0.40), int(H * 0.52)))
+        vector_arrows.append(((int(W * 0.25), int(H * 0.58)), (int(W * 0.65), int(H * 0.58)), "표사 이동 벡터", (255, 210, 50)))
     elif any(k in narration for k in ["케이슨", "자중", "혼성제"]):
-        tech_tags.append(("케이슨 본체", "설계 자중 15,000t 급", int(W * 0.12), int(H * 0.42)))
-        tech_tags.append(("사석 마운드", "두께 5.0m 지지층", int(W * 0.52), int(H * 0.68)))
-        vectors.append(((int(W * 0.88), int(H * 0.42)), (int(W * 0.58), int(H * 0.45)), "Goda 쇄파압 파력", (255, 75, 45)))
+        callouts.append(("설계 자중", "15,000 t", int(W * 0.22), int(H * 0.38), int(W * 0.42), int(H * 0.45)))
+        vector_arrows.append(((int(W * 0.80), int(H * 0.40)), (int(W * 0.55), int(H * 0.43)), "Goda 쇄파압", (255, 90, 60)))
     elif any(k in narration for k in ["테트라포드", "소파블록", "4개"]):
-        tech_tags.append(("소파블록 피복", "단위중량 50t TTP", int(W * 0.15), int(H * 0.48)))
-        tech_tags.append(("인터로킹 맞물림", "파력 분산 공극률 50%", int(W * 0.50), int(H * 0.36)))
-        vectors.append(((int(W * 0.82), int(H * 0.35)), (int(W * 0.55), int(H * 0.45)), "수리 충격 분산", (0, 230, 180)))
+        callouts.append(("소파블록", "50t TTP", int(W * 0.22), int(H * 0.40), int(W * 0.40), int(H * 0.48)))
+        vector_arrows.append(((int(W * 0.75), int(H * 0.36)), (int(W * 0.52), int(H * 0.42)), "공극률 50% 분산", (0, 230, 190)))
     elif any(k in narration for k in ["준설", "수심"]):
-        tech_tags.append(("대형 호퍼 준설", "목표 계획수심 -16.0m", int(W * 0.12), int(H * 0.45)))
-        tech_tags.append(("항로 정비", "준설 속도 1.8 knot", int(W * 0.52), int(H * 0.35)))
-        vectors.append(((int(W * 0.30), int(H * 0.50)), (int(W * 0.30), int(H * 0.70)), "해저 토사 흡입력", (255, 180, 0)))
+        callouts.append(("계획수심", "-16.0 m", int(W * 0.22), int(H * 0.42), int(W * 0.45), int(H * 0.52)))
     else:
-        tech_tags.append(("해안 수리역학 해석", "수치 시뮬레이션 KDS 64", int(W * 0.12), int(H * 0.42)))
-        tech_tags.append(("파랑 에너지 제어", "에너지 투과율 감쇄", int(W * 0.52), int(H * 0.35)))
-        vectors.append(((int(W * 0.85), int(H * 0.40)), (int(W * 0.55), int(H * 0.45)), "유체 압력 벡터", (0, 220, 255)))
+        callouts.append(("수리역학 해석", "KDS 64 10", int(W * 0.22), int(H * 0.40), int(W * 0.45), int(H * 0.48)))
+        vector_arrows.append(((int(W * 0.78), int(H * 0.38)), (int(W * 0.52), int(H * 0.42)), "파랑 투과 감쇄", (0, 220, 255)))
 
-    # 2. 파랑 / 하중 벡터 화살표 렌더링 (Stage 4 Force/Pressure Vectors)
-    for start_pt, end_pt, vec_label, color_rgb in vectors:
+    # 2. 물리/유체 벡터 화살표 렌더링 (신비한 건축사전: 슬림한 2px 선 + 세련된 미니멀 화살촉)
+    for start_pt, end_pt, vec_label, color_rgb in vector_arrows:
         x1, y1 = start_pt
         x2, y2 = end_pt
         
-        # 반투명 발광 효과
-        draw.line([(x1, y1), (x2, y2)], fill=(color_rgb[0], color_rgb[1], color_rgb[2], 140), width=9)
-        draw.line([(x1, y1), (x2, y2)], fill=(255, 255, 255, 240), width=4)
+        # 얇고 섬세한 발광 라인
+        draw.line([(x1, y1), (x2, y2)], fill=(color_rgb[0], color_rgb[1], color_rgb[2], 120), width=5)
+        draw.line([(x1, y1), (x2, y2)], fill=(255, 255, 255, 230), width=2)
         
-        # 화살표 촉 (Arrowhead) 계산
-        dx = x2 - x1
-        dy = y2 - y1
+        # 슬림한 화살표 촉
+        dx, dy = x2 - x1, y2 - y1
         length = math.hypot(dx, dy)
-        if length > 10:
-            ux = dx / length
-            uy = dy / length
-            arrow_size = int(W * 0.035)
-            # 좌우 날개
-            wx1 = x2 - arrow_size * ux + arrow_size * 0.5 * uy
-            wy1 = y2 - arrow_size * uy - arrow_size * 0.5 * ux
-            wx2 = x2 - arrow_size * ux - arrow_size * 0.5 * uy
-            wy2 = y2 - arrow_size * uy + arrow_size * 0.5 * ux
-            draw.polygon([(x2, y2), (wx1, wy1), (wx2, wy2)], fill=(color_rgb[0], color_rgb[1], color_rgb[2], 230))
+        if length > 8:
+            ux, uy = dx / length, dy / length
+            asize = int(W * 0.022)
+            wx1 = x2 - asize * ux + asize * 0.4 * uy
+            wy1 = y2 - asize * uy - asize * 0.4 * ux
+            wx2 = x2 - asize * ux - asize * 0.4 * uy
+            wy2 = y2 - asize * uy + asize * 0.4 * ux
+            draw.polygon([(x2, y2), (wx1, wy1), (wx2, wy2)], fill=(color_rgb[0], color_rgb[1], color_rgb[2], 240))
             
-        # 벡터 라벨
-        mid_x = (x1 + x2) // 2
-        mid_y = (y1 + y2) // 2 - int(H * 0.025)
-        tw = int(draw.textlength(vec_label, font=font_small))
-        draw.rectangle([(mid_x - tw // 2 - 8, mid_y - 4), (mid_x + tw // 2 + 8, mid_y + int(H * 0.025) + 4)],
-                       fill=(10, 20, 35, 200), outline=(color_rgb[0], color_rgb[1], color_rgb[2], 220), width=1)
-        draw.text((mid_x - tw // 2, mid_y), vec_label, fill=(240, 245, 255, 255), font=font_small)
+        # 벡터 설명 미니 뱃지 (화면 중심 방해 없이 선 중간에 살짝 부착)
+        mx, my = (x1 + x2) // 2, (y1 + y2) // 2 - int(H * 0.018)
+        lw = int(draw.textlength(vec_label, font=font_label))
+        draw.rectangle([(mx - lw // 2 - 6, my - 3), (mx + lw // 2 + 6, my + int(H * 0.020))],
+                       fill=(10, 20, 35, 180), outline=(color_rgb[0], color_rgb[1], color_rgb[2], 160), width=1)
+        draw.text((mx - lw // 2, my), vec_label, fill=(235, 245, 255, 240), font=font_label)
 
-    # 3. 3D 공학 지시선 및 치수 라벨 박스 렌더링 (Stage 4 Callouts & Dimensions)
-    for title, val, bx, by in tech_tags:
-        # 앵커 포인트 및 지시선 (선명한 꺾임 지시선)
-        anchor_x = bx + int(W * 0.12)
-        anchor_y = by + int(H * 0.09)
-        draw.ellipse([(anchor_x - 4, anchor_y - 4), (anchor_x + 4, anchor_y + 4)], fill=(0, 255, 255, 255))
-        draw.ellipse([(anchor_x - 8, anchor_y - 8), (anchor_x + 8, anchor_y + 8)], outline=(0, 255, 255, 160), width=2)
+    # 3. 3D 공학 지시선 & 미니멀 치수 뱃지 (신비한 건축사전 및 MD 규격)
+    for label, val_text, badge_x, badge_y, anchor_x, anchor_y in callouts:
+        # 미세 앵커 닷 (Point Anchor)
+        draw.ellipse([(anchor_x - 3, anchor_y - 3), (anchor_x + 3, anchor_y + 3)], fill=(0, 255, 255, 255))
+        draw.ellipse([(anchor_x - 6, anchor_y - 6), (anchor_x + 6, anchor_y + 6)], outline=(0, 255, 255, 120), width=1)
         
-        elbow_x = bx + int(W * 0.06)
-        elbow_y = by + int(H * 0.04)
-        draw.line([(anchor_x, anchor_y), (elbow_x, elbow_y), (bx + int(W * 0.02), elbow_y)], fill=(0, 220, 255, 220), width=2)
+        # 1~2px 헤어라인 꺾임 지시선
+        elbow_x = badge_x + int(W * 0.08)
+        draw.line([(anchor_x, anchor_y), (elbow_x, badge_y + int(H * 0.015)), (badge_x + int(W * 0.02), badge_y + int(H * 0.015))],
+                  fill=(0, 230, 255, 180), width=1)
         
-        # 반투명 테크니컬 HUD 글래스 박스
-        t_w1 = int(draw.textlength(title, font=font_small))
-        t_w2 = int(draw.textlength(val, font=font_large))
-        box_w = max(t_w1, t_w2) + int(W * 0.04)
-        box_h = int(H * 0.065)
+        # 초경량 미니멀 글래스 뱃지 (더 이상 거대한 박스가 아님!)
+        w_lbl = int(draw.textlength(label, font=font_label))
+        w_val = int(draw.textlength(val_text, font=font_val))
+        bw = max(w_lbl, w_val) + int(W * 0.03)
+        bh = int(H * 0.038)
         
-        # 박스 배경 및 외곽 테두리 (모던 블루 테크)
-        draw.rectangle([(bx, by - int(H * 0.02)), (bx + box_w, by + box_h)], fill=(12, 28, 48, 205), outline=(0, 210, 255, 220), width=2)
-        # 상단 테두리 포인트 바
-        draw.rectangle([(bx, by - int(H * 0.02)), (bx + int(box_w * 0.35), by - int(H * 0.02) + 3)], fill=(0, 255, 255, 255))
+        # 딥 다크 네이비 투명 블렌딩 + 1px 시안 보더
+        draw.rectangle([(badge_x, badge_y), (badge_x + bw, badge_y + bh)],
+                       fill=(8, 18, 32, 175), outline=(0, 210, 255, 160), width=1)
+        # 좌측 2px 액센트 바
+        draw.line([(badge_x, badge_y), (badge_x, badge_y + bh)], fill=(0, 255, 255, 255), width=2)
         
-        draw.text((bx + int(W * 0.02), by - int(H * 0.012)), title, fill=(160, 215, 255, 255), font=font_small)
-        draw.text((bx + int(W * 0.02), by + int(H * 0.015)), val, fill=(255, 255, 255, 255), font=font_large)
-
-    # 4. 상단 우측 공학 다큐멘터리 엠블럼 워터마크
-    sub_title_text = f"OCEAN CODE LAB ENG-SPEC // SCENE {sid:02d}"
-    sw = int(draw.textlength(sub_title_text, font=font_small))
-    top_x = W - sw - int(W * 0.05)
-    top_y = int(H * 0.04)
-    draw.rectangle([(top_x - 10, top_y - 4), (W - int(W * 0.03), top_y + int(H * 0.028))], fill=(5, 15, 30, 180), outline=(0, 180, 240, 140), width=1)
-    draw.text((top_x, top_y), sub_title_text, fill=(140, 210, 255, 230), font=font_small)
+        draw.text((badge_x + int(W * 0.015), badge_y + 2), label, fill=(160, 215, 255, 220), font=font_label)
+        draw.text((badge_x + int(W * 0.015), badge_y + int(H * 0.016)), val_text, fill=(255, 255, 255, 255), font=font_val)
 
     # 오버레이 블렌딩
     info_img = Image.alpha_composite(info_img.convert("RGBA"), overlay).convert("RGB")

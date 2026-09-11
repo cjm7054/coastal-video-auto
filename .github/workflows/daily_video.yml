@@ -109,7 +109,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: visual-assets
-          path: output/current_job/images
+          path: |
+            output/current_job/images
+            output/current_job/clean
+            output/current_job/info
           retention-days: 1
 
   # =========================================================================
@@ -196,7 +199,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: visual-assets
-          path: output/current_job/images
+          path: output/current_job
 
       - name: 오디오 에셋 병합
         uses: actions/download-artifact@v4

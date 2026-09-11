@@ -104,51 +104,51 @@ def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
         angle = 0.0  # 카메라 롤 회전 각도 (Degrees)
         
         if camera_mode == 0:
-            # 1. [FPV 오비탈 쾌속 선회 & 돌진 줌인]: 시원하게 파고들며 역동적인 선회 기동
-            theta = 2.4 * math.pi * v
-            scale = 1.08 + 0.50 * (v ** 0.85)  # 최대 1.58배 대형 줌인
-            cur_dx = max_dx * 0.90 * math.cos(theta)
-            cur_dy = max_dy * 0.75 * math.sin(theta)
-            angle = -5.0 * math.sin(theta)  # 역동적인 비행 뱅크 각도
+            # 1. [FPV 오비탈 선회 궤적]: 정제된 3D 궤적 기동
+            theta = 1.6 * math.pi * v
+            scale = 1.04 + 0.16 * (v ** 0.85)
+            cur_dx = max_dx * 0.40 * math.cos(theta)
+            cur_dy = max_dy * 0.35 * math.sin(theta)
+            angle = -2.5 * math.sin(theta)
             
         elif camera_mode == 1:
-            # 2. [초고속 수직 비상 & 크레인 틸트업]: 하단 기초 암반에서 상부로 시원하게 상승
-            scale = 1.06 + 0.46 * v
-            cur_dx = max_dx * 0.40 * (1.0 - 2.0 * t)
-            cur_dy = max_dy * (1.0 - 2.0 * v)  # 하단에서 상단으로 강력한 쾌속 상승
-            angle = 1.8 * (1.0 - 2.0 * t)
+            # 2. [수직 상승 크레인 틸트업]: 하단에서 상부로 안정적 상승
+            scale = 1.03 + 0.15 * v
+            cur_dx = max_dx * 0.20 * (1.0 - 2.0 * t)
+            cur_dy = max_dy * 0.50 * (1.0 - 2.0 * v)
+            angle = 1.0 * (1.0 - 2.0 * t)
             
         elif camera_mode == 2:
-            # 3. [FPV 맹렬한 급강하 & 다이브 펀치인]: 상공에서 유공벽/구조물 코앞으로 쏜살같이 파고듦
-            scale = 1.04 + 0.56 * (v ** 1.15)  # 1.6배 강력한 돌진 다이브
-            cur_dx = -max_dx * 0.80 * (1.0 - 2.0 * t)
-            cur_dy = -max_dy * 0.85 * (1.0 - 2.0 * t)
-            angle = 4.0 * math.sin(math.pi * t)
+            # 3. [FPV 다이브 포커스]: 상공에서 구조물 코앞으로 슬라이딩
+            scale = 1.02 + 0.18 * (v ** 1.1)
+            cur_dx = -max_dx * 0.35 * (1.0 - 2.0 * t)
+            cur_dy = -max_dy * 0.40 * (1.0 - 2.0 * t)
+            angle = 2.0 * math.sin(math.pi * t)
             
         elif camera_mode == 3:
-            # 4. [고속 해안선 수평 트래킹 헬리캠]: 수평선을 가로지르며 시원하게 훑고 지나감
-            scale = 1.55 - 0.45 * v  # 넓은 화각으로 시원하게 빠지는 줌아웃 트래킹
-            cur_dx = max_dx * (1.0 - 2.0 * t)   # 우측에서 좌측으로 고속 질주
-            cur_dy = max_dy * 0.45 * math.sin(math.pi * t)
-            angle = -2.5 * (1.0 - 2.0 * t)
+            # 4. [해안선 수평 트래킹]: 수평선을 부드럽게 가로지르는 트래킹
+            scale = 1.18 - 0.14 * v
+            cur_dx = max_dx * 0.45 * (1.0 - 2.0 * t)
+            cur_dy = max_dy * 0.20 * math.sin(math.pi * t)
+            angle = -1.2 * (1.0 - 2.0 * t)
             
         elif camera_mode == 4:
-            # 5. [수직 하강 & 단면 투시도 급속 포커스]: 상공에서 수중 단면으로 파고드는 하강 샷
-            scale = 1.52 - 0.42 * (v ** 0.9)
-            cur_dx = -max_dx * 0.50 * (1.0 - 2.0 * t)
-            cur_dy = -max_dy * (1.0 - 2.0 * v)  # 상단에서 하단으로 쾌속 하강
-            angle = -1.6 * (1.0 - 2.0 * t)
+            # 5. [수직 하강 투시도 포커스]: 상단에서 하단으로 안정적인 틸트다운
+            scale = 1.16 - 0.12 * (v ** 0.9)
+            cur_dx = -max_dx * 0.25 * (1.0 - 2.0 * t)
+            cur_dy = -max_dy * 0.45 * (1.0 - 2.0 * v)
+            angle = -1.0 * (1.0 - 2.0 * t)
             
         else:
-            # 6. [스피디한 360도 반경 아크 스위프 & 롤]: 회전하며 다이내믹하게 빨려 들어가는 무빙
-            theta = 1.5 * math.pi * v
-            scale = 1.10 + 0.48 * math.sin(math.pi * v)
-            cur_dx = -max_dx * math.cos(theta)
-            cur_dy = max_dy * 0.70 * math.sin(theta)
-            angle = 5.0 * math.cos(theta)
+            # 6. [아크 스위프]: 회전하며 다이내믹하게 빨려 들어가는 무빙
+            theta = 1.2 * math.pi * v
+            scale = 1.05 + 0.14 * math.sin(math.pi * v)
+            cur_dx = -max_dx * 0.35 * math.cos(theta)
+            cur_dy = max_dy * 0.35 * math.sin(theta)
+            angle = 2.5 * math.cos(theta)
             
-        # 6초 이상 장면에서 중간 지루함을 끊어주는 시네마틱 펄스(미세 텐션)
-        micro_zoom = 1.0 + 0.04 * math.sin(4 * math.pi * t)
+        # 미세 시네마틱 텐션
+        micro_zoom = 1.0 + 0.015 * math.sin(4 * math.pi * t)
         scale *= micro_zoom
 
         # 목표 크롭 크기
