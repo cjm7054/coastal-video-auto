@@ -174,7 +174,7 @@ def generate_script(topic: str, out_dir: Path) -> dict:
                 log.info("Gemini Flash 모델로 고품질 다큐 대본 생성 중...")
                 g_client = genai.Client(api_key=gemini_key)
                 resp = g_client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.6-flash",
                     contents=prompt,
                 )
                 text = resp.text.strip()
