@@ -401,6 +401,17 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
         success = False
         clean_pil = None
 
+        # 0차: 이미 고화질 3D 실사 이미지가 사전에 준비되어 있는 경우 즉시 활용
+        if out_clean.exists() and out_clean.stat().st_size > 10000:
+            log.info(f"CLEAN 이미지 {sid}: 사전에 준비된 고화질 3D 실사 에셋 활용")
+            clean_pil = Image.open(out_clean).convert("RGB")
+            success = True
+        elif out_main.exists() and out_main.stat().st_size > 10000:
+            log.info(f"CLEAN 이미지 {sid}: 기존 images 에셋 활용")
+            clean_pil = Image.open(out_main).convert("RGB")
+            success = True
+
+
         # 1차: AI 이미지 생성기 (Google Imagen 또는 DALL-E 3)
         for gen_name, gen_func in generators:
             try:
