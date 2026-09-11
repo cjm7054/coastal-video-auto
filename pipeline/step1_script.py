@@ -258,6 +258,7 @@ def generate_script(topic: str, out_dir: Path) -> dict:
         log.warning(f"⚠️ Ruflo Swarm 멀티 에이전트 교차 감수 스킵 (기본 대본 유지): {r_err}")
 
     script["topic"] = topic
+    script["format"] = cfg.get("current_format", "longform")
     assert len(script["scenes"]) >= 3, "장면 수가 너무 적습니다"
     save_json(out_dir / "script.json", script)
     log.info(f"대본 완료: {script['title']} / 장면 {len(script['scenes'])}개")

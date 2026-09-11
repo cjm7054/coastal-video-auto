@@ -5,6 +5,13 @@ on:
     - cron: "0 18 * * *"        # 매일 새벽 03:00 KST (UTC 18:00)
   workflow_dispatch:            # Actions 탭에서 수동 실행 버튼
     inputs:
+      format:
+        description: "영상 포맷 (shorts: 9:16 쇼츠 | longform: 16:9 롱폼)"
+        type: choice
+        options:
+          - shorts
+          - longform
+        default: shorts
       topic:
         description: "주제 (비우면 topics.txt 첫 줄 사용)"
         required: false
@@ -46,6 +53,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           ARGS="--step script"
+          if [ -n "${{ github.event.inputs.format }}" ]; then ARGS="$ARGS --format ${{ github.event.inputs.format }}"; fi
           if [ -n "${{ github.event.inputs.topic }}" ]; then ARGS="$ARGS --topic \"${{ github.event.inputs.topic }}\""; fi
           OUTPUT=$(python run.py $ARGS)
           echo "$OUTPUT"

@@ -28,15 +28,17 @@ def main():
 
     if a.format:
         set_active_format(a.format)
-    cfg = load_config()
-    log.info(f"🎬 선택된 포맷: [{cfg['current_format'].upper()}] (해상도 {cfg['images']['width']}x{cfg['images']['height']}, 장면 {cfg['channel']['scenes']}개, 약 {cfg['channel']['target_minutes']}분)")
 
     if a.job_dir:
         job = Path(a.job_dir)
         script = load_json(job / "script.json") if (job / "script.json").exists() else None
+        if script and "format" in script and not a.format:
+            set_active_format(script["format"])
     elif a.resume:
         job = Path(a.resume)
         script = load_json(job / "script.json")
+        if script and "format" in script and not a.format:
+            set_active_format(script["format"])
     else:
         topic = a.topic or pop_next_topic()
         if not topic:
