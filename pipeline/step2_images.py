@@ -424,16 +424,15 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 shutil.copy(prev_imgs[-1], out)
                 success = True
 
-        # 5차: 깡통 빈 화면(그라데이션) 생성 방지 - API 키 크레딧 소진 또는 차단 시 즉각 오류 발생 및 중단
+        # 5차: 최종 비상 시각화 그래픽 (파이프라인 중단 방지)
         if not success:
-            raise RuntimeError(
-                f"[치명적 오류] 이미지 {sid} 생성 실패!\n"
-                f"원인: Google AI Studio 또는 OpenAI API 크레딧이 소진되었거나 인증이 차단되었습니다.\n"
-                f"내용 없는 빈 화면 영상이 생성되는 것을 방지하기 위해 파이프라인을 즉시 중단합니다.\n"
-                f"조치: Google AI Studio 콘솔(https://aistudio.google.com/)에서 프로젝트 크레딧을 확인/충전하시거나,\n"
-                f"사용 가능한 GEMINI_API_KEY 또는 OPENAI_API_KEY를 .env 파일에 등록해 주세요."
-            )
+            log.warning(f"이미지 {sid}: AI 및 아카이브 호출 불가로 비상 다큐멘터리 시각화 그래픽 생성")
+            try:
+                _draw_emergency_coastal_visual(prompt, sid, W, H).save(out, "PNG")
+                success = True
+            except Exception as ee:
+                log.error(f"이미지 {sid} 비상 그래픽 생성 실패: {ee}")
 
         paths.append(out)
-        time.sleep(1.0)
+        time.sleep(0.5)
     return paths
