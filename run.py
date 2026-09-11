@@ -8,12 +8,6 @@ import argparse, sys, traceback
 from pathlib import Path
 from pipeline.common import load_json, save_json, new_job_dir, pop_next_topic, log, ROOT, set_active_format, load_config
 from pipeline.step1_script import generate_script
-from pipeline.step2_images import generate_images
-from pipeline.step2b_video import generate_motion_clips
-from pipeline.step3_tts import generate_audio
-from pipeline.step4_assemble import assemble
-from pipeline.step5_thumbnail import make_thumbnail
-from pipeline.step6_upload import upload
 
 
 def main():
@@ -102,6 +96,8 @@ def main():
 
     # Step 2: Visual Studio Agent (이미지 및 비디오 생성)
     if a.step in ["all", "visual"]:
+        from pipeline.step2_images import generate_images
+        from pipeline.step2b_video import generate_motion_clips
         generate_images(script, job)
         motion_clips = generate_motion_clips(script, job)
         if a.step == "visual":
@@ -109,6 +105,7 @@ def main():
 
     # Step 3: Audio Master Agent (타입캐스트 모건 보이스 합성)
     if a.step in ["all", "audio"]:
+        from pipeline.step3_tts import generate_audio
         tl_path = job / "timeline.json"
         timeline = load_json(tl_path) if tl_path.exists() else generate_audio(script, job)
         save_json(tl_path, timeline)
@@ -117,6 +114,10 @@ def main():
 
     # Step 4: Video Editor Agent (최종 렌더링 & 믹싱)
     if a.step in ["all", "assemble"]:
+        from pipeline.step3_tts import generate_audio
+        from pipeline.step2b_video import generate_motion_clips
+        from pipeline.step4_assemble import assemble
+        from pipeline.step5_thumbnail import make_thumbnail
         tl_path = job / "timeline.json"
         timeline = load_json(tl_path) if tl_path.exists() else generate_audio(script, job)
         motion_clips = generate_motion_clips(script, job)
@@ -129,11 +130,13 @@ def main():
 
     # Step 5: Thumbnail Agent
     if a.step in ["all", "thumbnail"]:
+        from pipeline.step5_thumbnail import make_thumbnail
         thumb = make_thumbnail(script, job)
         if a.step == "thumbnail":
             return
 
     # Step 6: Publisher Agent (유튜브 업로드)
+    from pipeline.step6_upload import upload
     video = job / "final.mp4"
     thumb = job / "thumbnail.jpg"
 
