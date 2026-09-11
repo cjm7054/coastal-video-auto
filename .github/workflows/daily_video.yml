@@ -43,7 +43,7 @@ jobs:
           cache: pip
 
       - name: 의존성 설치
-        run: pip install --quiet pyyaml requests python-dotenv openai anthropic
+        run: pip install --quiet pyyaml requests python-dotenv openai anthropic google-genai pillow
 
       - name: 대본 및 시네마틱 씬 기획 생성
         id: plan

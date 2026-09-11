@@ -26,33 +26,44 @@ def main():
     ap.add_argument("--job-dir")
     a = ap.parse_args()
 
-    # 포맷 선택: CLI 인자가 없으면 터미널에서 대화형으로 롱폼/쇼츠 선택
+    # 1. 포맷 결정: CLI 인자 > 기존 job의 script.json > (대화형 터미널 입력 or 기본값)
     if a.format:
         set_active_format(a.format)
-    elif not a.job_dir and not a.resume:
-        print("\n" + "=" * 60)
-        print("🎬 [OCEAN CODE LAB] 영상 제작 포맷을 선택하세요:")
-        print("  1) 쇼츠   (9:16 세로형 쇼츠, 약 50초, 8장면) [기본값]")
-        print("  2) 롱폼   (16:9 가로형 다큐, 약 3.8분, 26장면)")
-        print("=" * 60)
-        try:
-            choice = input("선택 번호를 입력하세요 (1 또는 2, 엔터시 1): ").strip()
-        except (EOFError, KeyboardInterrupt):
-            choice = "1"
-        chosen_fmt = "longform" if choice == "2" else "shorts"
+    elif a.job_dir and (Path(a.job_dir) / "script.json").exists():
+        script_data = load_json(Path(a.job_dir) / "script.json")
+        if "format" in script_data:
+            set_active_format(script_data["format"])
+    elif a.resume and (Path(a.resume) / "script.json").exists():
+        script_data = load_json(Path(a.resume) / "script.json")
+        if "format" in script_data:
+            set_active_format(script_data["format"])
+    else:
+        # 터미널에서 대화형 입력이 가능한 환경일 때만 대화형 선택창 노출 (CI/헤드리스 환경에서는 shorts 기본)
+        default_fmt = "shorts"
+        if sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
+            print("\n" + "=" * 60)
+            print("🎬 [OCEAN CODE LAB] 영상 제작 포맷을 선택하세요:")
+            print("  1) 쇼츠   (9:16 세로형 쇼츠, 약 50초, 8장면) [기본값]")
+            print("  2) 롱폼   (16:9 가로형 다큐, 약 3.8분, 26장면)")
+            print("=" * 60)
+            try:
+                choice = input("선택 번호를 입력하세요 (1 또는 2, 엔터시 1): ").strip()
+            except (EOFError, KeyboardInterrupt):
+                choice = "1"
+            chosen_fmt = "longform" if choice == "2" else "shorts"
+        else:
+            chosen_fmt = default_fmt
+
         set_active_format(chosen_fmt)
         log.info(f"선택된 영상 포맷: {'롱폼 (16:9 다큐)' if chosen_fmt == 'longform' else '쇼츠 (9:16 세로)'}")
 
+    # 2. 작업 디렉토리 및 주제 설정
     if a.job_dir:
         job = Path(a.job_dir)
         script = load_json(job / "script.json") if (job / "script.json").exists() else None
-        if script and "format" in script and not a.format:
-            set_active_format(script["format"])
     elif a.resume:
         job = Path(a.resume)
-        script = load_json(job / "script.json")
-        if script and "format" in script and not a.format:
-            set_active_format(script["format"])
+        script = load_json(job / "script.json") if (job / "script.json").exists() else None
     else:
         topic = a.topic or pop_next_topic()
         if not topic:
