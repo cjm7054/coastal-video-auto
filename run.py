@@ -6,7 +6,7 @@
 """
 import argparse, sys, traceback
 from pathlib import Path
-from pipeline.common import load_json, save_json, new_job_dir, pop_next_topic, log, ROOT
+from pipeline.common import load_json, save_json, new_job_dir, pop_next_topic, log, ROOT, set_active_format, load_config
 from pipeline.step1_script import generate_script
 from pipeline.step2_images import generate_images
 from pipeline.step2b_video import generate_motion_clips
@@ -18,15 +18,28 @@ from pipeline.step6_upload import upload
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--topic"); ap.add_argument("--resume"); ap.add_argument("--no-upload", action="store_true")
+    ap.add_argument("--format", choices=["longform", "shorts"], help="영상 포맷 선택: longform(16:9 롱폼) 또는 shorts(9:16 쇼츠)")
+    ap.add_argument("--topic")
+    ap.add_argument("--resume")
+    ap.add_argument("--no-upload", action="store_true")
+    ap.add_argument("--step", choices=["all", "script", "visual", "audio", "assemble", "thumbnail", "upload"], default="all")
+    ap.add_argument("--job-dir")
     a = ap.parse_args()
 
-    if a.resume:
-        job = Path(a.resume); script = load_json(job / "script.json")
+    if a.format:
+        set_active_format(a.format)
+    cfg = load_config()
+    log.info(f"🎬 선택된 포맷: [{cfg['current_format'].upper()}] (해상도 {cfg['images']['width']}x{cfg['images']['height']}, 장면 {cfg['channel']['scenes']}개, 약 {cfg['channel']['target_minutes']}분)")
+
+    if a.job_dir:
+        job = Path(a.job_dir)
+        script = load_json(job / "script.json") if (job / "script.json").exists() else None
+    elif a.resume:
+        job = Path(a.resume)
+        script = load_json(job / "script.json")
     else:
         topic = a.topic or pop_next_topic()
         if not topic:
-            # [Ruflo Autonomous Topic Generator] topics.txt가 비어있어도 절대 중단되지 않고 대한민국 항만 토목 공학 주제를 자동 발굴
             log.info("topics.txt가 비어있어, AI 총괄 기획 에이전트가 최신 해양 토목 공학 주제를 자동 발굴합니다...")
             try:
                 import os
@@ -50,27 +63,62 @@ def main():
                 topic = "울릉도 사동항 50m 초심해 케이슨과 극한의 너울성 파도 극복 기술"
             log.info(f"선정된 자동 발굴 주제: {topic}")
         job = new_job_dir(topic)
-        script = generate_script(topic, job)
+        script = None
 
-    generate_images(script, job)
-    motion_clips = generate_motion_clips(script, job)
-    tl_path = job / "timeline.json"
-    timeline = load_json(tl_path) if tl_path.exists() else generate_audio(script, job)
-    save_json(tl_path, timeline)
+    # Step 1: Script (기획 & 대본 에이전트)
+    if a.step in ["all", "script"]:
+        if script is None:
+            script = generate_script(topic if 'topic' in locals() and topic else "해양 토목 공학", job)
+        if a.step == "script":
+            print(f"JOB_DIR={job.resolve()}")
+            return
+
+    # Step 2: Visual Studio Agent (이미지 및 비디오 생성)
+    if a.step in ["all", "visual"]:
+        generate_images(script, job)
+        motion_clips = generate_motion_clips(script, job)
+        if a.step == "visual":
+            return
+
+    # Step 3: Audio Master Agent (타입캐스트 모건 보이스 합성)
+    if a.step in ["all", "audio"]:
+        tl_path = job / "timeline.json"
+        timeline = load_json(tl_path) if tl_path.exists() else generate_audio(script, job)
+        save_json(tl_path, timeline)
+        if a.step == "audio":
+            return
+
+    # Step 4: Video Editor Agent (최종 렌더링 & 믹싱)
+    if a.step in ["all", "assemble"]:
+        tl_path = job / "timeline.json"
+        timeline = load_json(tl_path) if tl_path.exists() else generate_audio(script, job)
+        motion_clips = generate_motion_clips(script, job)
+        video = job / "final.mp4"
+        if not video.exists():
+            video = assemble(script, timeline, job, motion_clips)
+        thumb = make_thumbnail(script, job)
+        if a.step == "assemble":
+            return
+
+    # Step 5: Thumbnail Agent
+    if a.step in ["all", "thumbnail"]:
+        thumb = make_thumbnail(script, job)
+        if a.step == "thumbnail":
+            return
+
+    # Step 6: Publisher Agent (유튜브 업로드)
     video = job / "final.mp4"
-    if not video.exists():
-        video = assemble(script, timeline, job, motion_clips)
-    thumb = make_thumbnail(script, job)
+    thumb = job / "thumbnail.jpg"
 
-    # [★ 비용 및 크레딧 결산 브리핑 - 깃허브 Actions Step Summary 및 로그 자동 기록]
     try:
         from pipeline.cost_tracker import tracker
         tracker.save_and_brief(job)
     except Exception as te:
         log.warning(f"크레딧 결산 기록 실패: {te}")
 
-    if a.no_upload:
-        log.info(f"검토용 완료 → {job}"); return
+    if a.no_upload or a.step != "all":
+        log.info(f"작업 완료 → {job}")
+        return
     url = upload(script, video, thumb)
     with open(ROOT / "uploaded.log", "a", encoding="utf-8") as f:
         f.write(f"{job.name}\t{script['title']}\t{url}\n")

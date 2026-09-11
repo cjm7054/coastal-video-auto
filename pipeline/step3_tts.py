@@ -65,7 +65,7 @@ def _words_to_cues(words, max_chars=22):
 
 def _typecast_one(text: str, mp3: Path, cfg: dict):
     """Typecast AI 공식 REST API를 통한 유료 '모건' 보이스 합성"""
-    import requests
+    import json, subprocess, requests
     api_key = os.environ.get("TYPECAST_API_KEY", "").strip()
     voice_id = os.environ.get("TYPECAST_VOICE_ID", "").strip() or cfg["tts"].get("typecast_voice_id", "tc_6256118ea1103af69f0a87ec")
     model = cfg["tts"].get("typecast_model", "ssfm-v30")
@@ -76,7 +76,7 @@ def _typecast_one(text: str, mp3: Path, cfg: dict):
 
     url = "https://api.typecast.ai/v1/text-to-speech"
     headers = {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=utf-8",
         "X-API-KEY": api_key
     }
     payload = {
@@ -91,19 +91,53 @@ def _typecast_one(text: str, mp3: Path, cfg: dict):
             "audio_format": "mp3"
         }
     }
+    raw_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
-    resp = requests.post(url, headers=headers, json=payload, timeout=60)
-    if resp.status_code != 200:
-        raise RuntimeError(f"Typecast API 호출 실패 ({resp.status_code}): {resp.text}")
-
-    mp3.write_bytes(resp.content)
+    # 1. requests 시도
+    req_err = None
     try:
-        from .cost_tracker import tracker
-        tracker.track_typecast(len(text), voice_name="모건")
-    except Exception:
-        pass
-    
-    # 균등 타임스탬프 계산 (단어 단위 자막 생성용)
+        resp = requests.post(url, headers=headers, data=raw_bytes, timeout=60)
+        if resp.status_code == 200 and len(resp.content) > 1000:
+            mp3.write_bytes(resp.content)
+            try:
+                from .cost_tracker import tracker
+                tracker.track_typecast(len(text), voice_name="모건")
+            except Exception:
+                pass
+            return _calculate_word_timestamps(text, mp3)
+        else:
+            req_err = f"Status {resp.status_code}: {resp.text}"
+    except Exception as e:
+        req_err = str(e)
+
+    # 2. Windows 시스템 curl.exe 폴백 (네트워크 환경/SSL 호환성 보장)
+    try:
+        temp_json = mp3.with_suffix(".json")
+        temp_json.write_bytes(raw_bytes)
+        cmd = [
+            "curl.exe", "-s", "-X", "POST", url,
+            "-H", f"X-API-KEY: {api_key}",
+            "-H", "Content-Type: application/json; charset=utf-8",
+            "--data-binary", f"@{temp_json}",
+            "-o", str(mp3)
+        ]
+        res = subprocess.run(cmd, capture_output=True, timeout=60)
+        if temp_json.exists():
+            temp_json.unlink()
+        if res.returncode == 0 and mp3.exists() and mp3.stat().st_size > 1000:
+            try:
+                from .cost_tracker import tracker
+                tracker.track_typecast(len(text), voice_name="모건")
+            except Exception:
+                pass
+            return _calculate_word_timestamps(text, mp3)
+        else:
+            raise RuntimeError(f"Typecast curl 실패: {res.stderr.decode('utf-8', errors='ignore')}")
+    except Exception as ce:
+        raise RuntimeError(f"Typecast 호출 실패 (requests: {req_err}, curl: {ce})")
+
+
+def _calculate_word_timestamps(text: str, mp3: Path):
     total_dur = _mp3_duration(mp3)
     raw_words = text.split()
     words = []

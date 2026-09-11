@@ -21,12 +21,13 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
     for fm in multimodal_models:
         try:
             log.info(f"Gemini({fm}) 이미지 생성 호출: {clean_prompt[:60]}...")
+            ar = cfg["images"].get("aspect_ratio", "16:9")
             resp = client.models.generate_content(
                 model=fm,
                 contents=clean_prompt,
                 config=types.GenerateContentConfig(
                     response_modalities=["IMAGE"],
-                    image_config=types.ImageConfig(aspect_ratio="16:9")
+                    image_config=types.ImageConfig(aspect_ratio=ar)
                 ),
             )
             for part in getattr(resp, "parts", []):
@@ -121,59 +122,58 @@ def _openai(prompt: str, cfg: dict) -> bytes:
     if not api_key:
         raise ValueError("OPENAI_API_KEY 환경변수가 설정되지 않았습니다.")
     client = OpenAI(api_key=api_key)
+    
+    # DALL-E 3 전용 클린 프롬프트 (군더더기 없는 800자 제한)
     clean_prompt = prompt[:950]
     
-    # 1. 최신 OpenAI 이미지 생성 모델 (gpt-image-1-mini, gpt-image-1, chatgpt-image-latest)
-    modern_models = ["gpt-image-1-mini", "gpt-image-1", "chatgpt-image-latest"]
-    for m in modern_models:
-        try:
-            log.info(f"OpenAI({m}) 3D 일러스트 생성 호출: {clean_prompt[:60]}...")
-            r = client.images.generate(
-                model=m,
-                prompt=clean_prompt,
-            )
-            if r and r.data:
-                item = r.data[0]
-                try:
-                    from .cost_tracker import tracker
-                    tracker.track_openai_image(model=m, count=1)
-                except Exception:
-                    pass
-                b64 = getattr(item, "b64_json", None)
-                if b64:
-                    return base64.b64decode(b64)
-                url = getattr(item, "url", None)
-                if url:
-                    resp = requests.get(url, timeout=60)
-                    if resp.status_code == 200:
-                        return resp.content
-        except Exception as me:
-            log.warning(f"OpenAI({m}) 생성 실패: {me}")
+    dalle_size = cfg["images"].get("dalle_size", "1792x1024")
+    
+    # 1. DALL-E 3 네이티브 비율 (1792x1024 or 1024x1792) + 자연스러운 다큐멘터리 스타일(natural) + HD 퀄리티
+    try:
+        log.info(f"OpenAI(dall-e-3 {dalle_size} HD natural) 호출: {clean_prompt[:70]}...")
+        r = client.images.generate(
+            model="dall-e-3",
+            prompt=clean_prompt,
+            size=dalle_size,
+            quality="hd",
+            style="natural",
+        )
+        if r and r.data:
+            item = r.data[0]
+            try:
+                from .cost_tracker import tracker
+                tracker.track_openai_image(model="dall-e-3", count=1)
+            except Exception:
+                pass
+            b64 = getattr(item, "b64_json", None)
+            if b64:
+                return base64.b64decode(b64)
+            url = getattr(item, "url", None)
+            if url:
+                resp = requests.get(url, timeout=60)
+                if resp.status_code == 200:
+                    return resp.content
+    except Exception as me:
+        log.warning(f"DALL-E 3 1792x1024 HD 생성 실패: {me} → 표준 모드로 재시도")
 
-    # 2. 구형 DALL-E 모델 대비 (dall-e-3, dall-e-2)
-    for dm in ["dall-e-3", "dall-e-2"]:
-        try:
-            r = client.images.generate(
-                model=dm,
-                prompt=clean_prompt[:400] if dm == "dall-e-2" else clean_prompt,
-            )
-            if r and r.data:
-                item = r.data[0]
-                try:
-                    from .cost_tracker import tracker
-                    tracker.track_openai_image(model=dm, count=1)
-                except Exception:
-                    pass
-                b64 = getattr(item, "b64_json", None)
-                if b64:
-                    return base64.b64decode(b64)
-                url = getattr(item, "url", None)
-                if url:
-                    resp = requests.get(url, timeout=60)
-                    if resp.status_code == 200:
-                        return resp.content
-        except Exception as de:
-            log.warning(f"OpenAI({dm}) 실패: {de}")
+    # 2. DALL-E 3 표준 1024x1024 백업
+    try:
+        r = client.images.generate(
+            model="dall-e-3",
+            prompt=clean_prompt,
+            size="1024x1024",
+            quality="standard",
+            style="natural",
+        )
+        if r and r.data:
+            item = r.data[0]
+            url = getattr(item, "url", None)
+            if url:
+                resp = requests.get(url, timeout=60)
+                if resp.status_code == 200:
+                    return resp.content
+    except Exception as de:
+        log.warning(f"DALL-E 3 표준 모드 실패: {de}")
 
     raise RuntimeError("OpenAI 이미지 데이터 수신 실패")
 
@@ -367,9 +367,12 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
         if out.exists():
             paths.append(out)
             continue
-        # [Ruflo Visual Guard] 장난감/미니어처/플라스틱 모형 방지 및 실제 토목 스케일 가이드
-        scale_guard = "Photorealistic maritime civil engineering, massive scale, no miniature, no plastic toy, real weathered concrete and rough sea environment."
-        prompt = f"{p}. {scale_guard} {suffix}"
+        # [Modern Documentary Visual Guard] 칙칙한 단면도, 지하 흙더미, HUD 화살표 필터링
+        clean_p = p.strip().rstrip(".")
+        # 과거 프롬프트 잔재(단면도, 자갈층, 붉은 화살표 등) 제거
+        for ban in ["cross-section cutaway diagram", "cross-section", "cutaway diagram", "glowing red hydrodynamic wave pressure vectors", "glowing red pressure vectors", "technical HUD overlays"]:
+            clean_p = clean_p.replace(ban, "cinematic clear ocean perspective")
+        prompt = f"{clean_p}. {suffix}"
         success = False
 
         # 1차: AI 이미지 생성기 (DALL-E 3 또는 Google Imagen)

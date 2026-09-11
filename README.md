@@ -37,11 +37,11 @@ topics.txt 주제 → ① Claude 대본(JSON, 장면별 motion 지정) → ② G
 ## 2. 첫 실행 (업로드 없이 검토)
 
 ```
-python run.py --topic "테트라포드 하나가 70톤인 이유" --no-upload
+python run.py --format shorts --topic "해운대 백사장을 붙잡고 있는 물속의 둑" --no-upload   # 쇼츠 (9:16 세로형, 50초, 8개 씬)
+python run.py --format longform --topic "해운대 백사장을 붙잡고 있는 물속의 둑" --no-upload # 롱폼 (16:9 가로형, 3.8분, 26개 씬)
 ```
 `output/날짜_주제/` 안에 `final.mp4`, `thumbnail.jpg`, `script.json`이 생깁니다.
-**처음 3~5편은 반드시 이 모드로 돌려서 대본·이미지 품질을 확인**하고 `config.yaml`의
-`persona`, `style_suffix`를 채널 취향에 맞게 다듬으세요. 여기서 품질이 결정됩니다.
+**`--format` 옵션을 주지 않으면 `config.yaml`의 기본 설정값(`format: "longform"`)**에 따라 생성됩니다.
 
 비용(8분 영상 1편): 대본 약 100원 + 이미지 19장 약 1,000원 + Veo 6클립(1080p) 약 3,300원 + TTS 무료 ≈ **4,500원**
 `video_gen.resolution`을 720p로 낮추면 Veo 비용이 절반. `video_gen.enabled: false`면 패럴랙스만으로 제작(1,100원).

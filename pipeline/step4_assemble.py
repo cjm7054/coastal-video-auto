@@ -92,15 +92,19 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
         content = subs_srt.read_text(encoding="utf-8")
         blocks = re.split(r"\n\s*\n", content.strip())
         
+        # Windows와 Linux 모두에서 한글 자막이 절대 깨지지 않도록 시스템 기본 고딕 및 로컬 폰트 지정
+        sub_fsize = cfg["video"].get("subtitle_font_size", 54)
+        sub_margin_v = cfg["video"].get("subtitle_margin_v", 110)
+        
         ass_header = (
             "[Script Info]\n"
             "ScriptType: v4.00+\n"
-            "PlayResX: 1920\n"
-            "PlayResY: 1080\n"
+            f"PlayResX: {W}\n"
+            f"PlayResY: {H}\n"
             "ScaledBorderAndShadow: yes\n\n"
             "[V4+ Styles]\n"
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
-            "Style: Default,Noto Sans CJK KR,52,&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,2,60,60,110,1\n\n"
+            f"Style: Default,맑은 고딕,{sub_fsize},&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,2,60,60,{sub_margin_v},1\n\n"
             "[Events]\n"
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
         )
@@ -116,14 +120,14 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
                     text = "\\N".join(lines[2:])
                     events.append(f"Dialogue: 0,{s_ass},{e_ass},Default,,0,0,0,,{text}")
         
-        subs_ass.write_text(ass_header + "\n".join(events) + "\n", encoding="utf-8")
+        subs_ass.write_text(ass_header + "\n".join(events) + "\n", encoding="utf-8-sig")
         
         local_font = ROOT / cfg["video"].get("subtitle_font", "assets/fonts/NotoSansCJK-Bold.ttc")
         if local_font.exists():
             shutil.copy(local_font, tmp / "font.ttc")
         
-        # ass 필터는 파일 내부(subs.ass)에 스타일이 완벽히 정의되어 있어 filter_complex 구문 파싱 충돌이 전혀 없습니다
-        sub_filter = "ass=subs.ass"
+        # ass 필터 및 폰트 디렉토리 안전 참조
+        sub_filter = "ass=subs.ass:fontsdir=."
 
     inputs = ["-i", "joined.mp4"]
     fc, vin = [], "[0:v]"
@@ -152,11 +156,11 @@ def assemble(script: dict, timeline: dict, out_dir: Path, motion_clips: dict | N
            "-c:a", "aac", "-movflags", "+faststart", "final.mp4"]
     r = subprocess.run(cmd, cwd=str(tmp), capture_output=True, text=True)
 
-    # 2차 시도: 혹시 ASS 필터 문제 발생 시 SRT 기본 필터로 재시도
+    # 2차 시도: 혹시 ASS 필터 문제 발생 시 SRT 기본 필터로 재시도 (맑은 고딕 / NotoSans fallback)
     if r.returncode != 0 and subs_srt.exists():
         log.warning(f"1차 ASS 렌더링 실패 ({r.stderr[-200:].strip()}) → SRT 자막으로 재시도")
         shutil.copy(subs_srt, tmp / "subs.srt")
-        fc_srt = fc + [f"{vin}subtitles=subs.srt[vout]"]
+        fc_srt = fc + [f"{vin}subtitles=subs.srt:force_style='FontName=맑은 고딕,FontSize=28,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3'[vout]"]
         cmd_retry = ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc_srt), "-map", "[vout]", *amap,
                      "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
                      "-c:a", "aac", "-movflags", "+faststart", "final.mp4"]

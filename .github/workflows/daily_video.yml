@@ -1,4 +1,4 @@
-name: daily-video
+name: multi-agent-video-pipeline
 
 on:
   schedule:
@@ -14,12 +14,19 @@ on:
         default: false
 
 permissions:
-  contents: write               # topics.txt 소비 내역을 다시 커밋하기 위해
+  contents: write               # 작업 결과 및 topic 소비 내역 커밋
 
 jobs:
-  build:
+  # =========================================================================
+  # [에이전트 1]: 총괄 기획 & 시나리오 디렉터 (Director Agent)
+  # - 역할: 주제 선정, 공학 팩트체크, GoDocs 스타일 4K 시네마틱 씬 플래닝
+  # =========================================================================
+  director_agent:
+    name: "Agent 1: 시나리오 총괄 디렉터"
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 20
+    outputs:
+      job_dir: ${{ steps.plan.outputs.job_dir }}
     steps:
       - uses: actions/checkout@v4
 
@@ -28,23 +35,163 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: FFmpeg + 한글 폰트
+      - name: 의존성 설치
+        run: pip install --quiet pyyaml requests python-dotenv openai anthropic
+
+      - name: 대본 및 시네마틱 씬 기획 생성
+        id: plan
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          ARGS="--step script"
+          if [ -n "${{ github.event.inputs.topic }}" ]; then ARGS="$ARGS --topic \"${{ github.event.inputs.topic }}\""; fi
+          OUTPUT=$(python run.py $ARGS)
+          echo "$OUTPUT"
+          JOB_DIR=$(find output -maxdepth 1 -mindepth 1 -type d | sort -r | head -n 1)
+          echo "job_dir=$JOB_DIR" >> $GITHUB_OUTPUT
+
+      - name: 기획 데이터 패키징 (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-job-dir
+          path: ${{ steps.plan.outputs.job_dir }}
+          retention-days: 1
+
+  # =========================================================================
+  # [에이전트 2]: 비주얼 스튜디오 아티스트 (Visual Studio Agent) - [병렬 실행 1]
+  # - 역할: 4K 시네마틱 에어리얼 드론, 공사 현장, 3D 수중 단면 렌더링 (글자 100% 차단)
+  # =========================================================================
+  visual_agent:
+    name: "Agent 2: 4K 비주얼 스튜디오"
+    needs: director_agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 의존성 설치
+        run: pip install --quiet pillow requests google-genai openai pyyaml python-dotenv
+
+      - name: 기획 데이터 복원
+        uses: actions/download-artifact@v4
+        with:
+          name: shared-job-dir
+          path: output/current_job
+
+      - name: GoDocs 스타일 4K 비주얼 렌더링
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python run.py --step visual --job-dir "output/current_job"
+
+      - name: 비주얼 에셋 패키징
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-assets
+          path: output/current_job/images
+          retention-days: 1
+
+  # =========================================================================
+  # [에이전트 3]: 오디오 사운드 마스터 (Audio Master Agent) - [병렬 실행 2]
+  # - 역할: 타입캐스트 모건(Morgan) 공식 API 보이스 합성 + 단어별 자막 타임스탬프
+  # =========================================================================
+  audio_agent:
+    name: "Agent 3: 오디오 사운드 마스터"
+    needs: director_agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: FFmpeg 설치 (오디오 측정용)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
+      - name: 의존성 설치
+        run: pip install --quiet requests pyyaml python-dotenv edge-tts
+
+      - name: 기획 데이터 복원
+        uses: actions/download-artifact@v4
+        with:
+          name: shared-job-dir
+          path: output/current_job
+
+      - name: 타입캐스트 모건 보이스 합성
+        env:
+          TYPECAST_API_KEY: ${{ secrets.TYPECAST_API_KEY }}
+          TYPECAST_VOICE_ID: ${{ secrets.TYPECAST_VOICE_ID }}
+        run: |
+          python run.py --step audio --job-dir "output/current_job"
+
+      - name: 오디오 에셋 패키징
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-assets
+          path: |
+            output/current_job/audio
+            output/current_job/timeline.json
+            output/current_job/subtitles.srt
+          retention-days: 1
+
+  # =========================================================================
+  # [에이전트 4]: 총괄 비디오 편집 & 퍼블리셔 (Video Editor & Publisher)
+  # - 역할: FPV 시네마틱 카메라 기동 + ASS 자막 오버레이 + BGM 믹싱 + 유튜브 송출
+  # =========================================================================
+  editor_agent:
+    name: "Agent 4: 시네마틱 편집 & 송출 감독"
+    needs: [director_agent, visual_agent, audio_agent]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: FFmpeg + 한글 폰트 설치
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg fonts-noto-cjk
 
-      - name: Python 패키지
+      - name: 의존성 설치
         run: |
-          pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
-          pip install --quiet -r requirements.txt
+          pip install --quiet opencv-python-headless pillow numpy pyyaml python-dotenv google-api-python-client google-auth-oauthlib
 
-      - name: 깊이 모델 캐시
-        uses: actions/cache@v4
+      - name: 기획 데이터 복원
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.cache/huggingface
-          key: depth-anything-v2-small
+          name: shared-job-dir
+          path: output/current_job
 
-      - name: 인증 파일 복원
+      - name: 비주얼 에셋 병합
+        uses: actions/download-artifact@v4
+        with:
+          name: visual-assets
+          path: output/current_job/images
+
+      - name: 오디오 에셋 병합
+        uses: actions/download-artifact@v4
+        with:
+          name: audio-assets
+          path: output/current_job
+
+      - name: 인증 파일 복원 (YouTube Data API)
         env:
           CLIENT_SECRET_JSON: ${{ secrets.YT_CLIENT_SECRET_JSON }}
           TOKEN_JSON: ${{ secrets.YT_TOKEN_JSON }}
@@ -52,43 +199,36 @@ jobs:
           echo "$CLIENT_SECRET_JSON" > client_secret.json
           echo "$TOKEN_JSON" > token.json
 
-      - name: 영상 제작 + 업로드
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          TYPECAST_API_KEY: ${{ secrets.TYPECAST_API_KEY }}
-          TYPECAST_VOICE_ID: ${{ secrets.TYPECAST_VOICE_ID }}
+      - name: 시네마틱 렌더링 및 썸네일 합성
         run: |
-          ARGS=""
-          if [ -n "${{ github.event.inputs.topic }}" ]; then ARGS="$ARGS --topic \"${{ github.event.inputs.topic }}\""; fi
-          if [ "${{ github.event.inputs.no_upload }}" = "true" ]; then ARGS="$ARGS --no-upload"; fi
-          eval python run.py $ARGS
+          python run.py --step assemble --job-dir "output/current_job"
 
-      - name: 결과물 보관 (30일)
+      - name: 유튜브 자동 업로드
+        if: github.event.inputs.no_upload != 'true'
+        run: |
+          python run.py --step upload --job-dir "output/current_job"
+
+      - name: 최종 고화질 결과물 보관 (30일)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: video-${{ github.run_number }}
+          name: final-release-${{ github.run_number }}
           path: |
-            output/**/final.mp4
-            output/**/thumbnail.jpg
-            output/**/script.json
-            output/**/subtitles.srt
-            output/**/credit_report.md
-            output/**/credit_report.json
+            output/current_job/final.mp4
+            output/current_job/thumbnail.jpg
+            output/current_job/script.json
+            output/current_job/subtitles.srt
+            output/current_job/credit_report.md
           retention-days: 30
-          if-no-files-found: ignore
 
-      - name: 주제 소비 내역 커밋
+      - name: 주제 소비 내역 및 Git 커밋
         if: success()
         run: |
           git config user.name "video-bot"
           git config user.email "bot@users.noreply.github.com"
           git add -A
           if ! git diff --cached --quiet; then
-            git commit -m "video: $(date +%F) 제작 완료" || true
+            git commit -m "video: $(date +%F) 멀티 에이전트 다큐멘터리 제작 완료" || true
           fi
           git fetch origin main || true
           git pull --rebase -Xtheirs origin main || git rebase --abort || true

@@ -3,11 +3,35 @@
 #  API 키는 여기 적지 말고 .env 파일에 넣으세요.
 # ===============================================================
 
+format: "longform"                   # "longform" (가로 16:9 다큐) | "shorts" (세로 9:16 쇼츠)
+
+formats:
+  longform:
+    target_minutes: 3.8                # 3.5~4.5분 롱폼 고밀도 다큐멘터리
+    scenes: 26                         # 26개 씬 (장면당 약 8초)
+    width: 1920
+    height: 1080
+    aspect_ratio: "16:9"
+    dalle_size: "1792x1024"
+    subtitle_font_size: 54
+    subtitle_margin_v: 110
+    thumbnail_size: [1280, 720]
+    thumbnail_font_size: 105
+  shorts:
+    target_minutes: 0.85               # 약 50초 내외 (60초 이내 쇼츠 최적화)
+    scenes: 8                          # 8개 씬 (장면당 약 6~7초 빠른 템포)
+    width: 1080
+    height: 1920
+    aspect_ratio: "9:16"
+    dalle_size: "1024x1792"
+    subtitle_font_size: 72             # 모바일 스마트폰 전면 자막 (크고 굵게)
+    subtitle_margin_v: 280             # 하단 쇼츠 UI(제목, 사운드 버튼 등) 가리지 않게 위로 띄움
+    thumbnail_size: [1080, 1920]
+    thumbnail_font_size: 90
+
 channel:
   name: "OCEAN CODE LAB (OCL)"       # 공식 채널명: OCEAN CODE LAB (OCL)
   language: "ko"
-  target_minutes: 3.8                # 신비한 건축사전식 정통 3.5~4.5분 롱폼 고밀도 다큐멘터리
-  scenes: 26                         # 26개 씬 (장면당 약 8초)의 다각도 컷 전환으로 지루할 틈 없는 신비한 건축사전 템포
 
 script:
   model: "claude-sonnet-4-6"
@@ -23,14 +47,13 @@ images:
   provider: "openai"                 # gemini (Google Imagen 3/4) | openai (DALL-E 3)
   gemini_model: "imagen-3.0-generate-002"
   openai_model: "dall-e-3"
-  width: 1920
-  height: 1080
-  # Unreal Engine 5 기반 실사풍 3D 건축/해저 단면 투시도(Cross-section cutaway) & 파압 벡터 HUD 오버레이
+  # 신비한 건축사전(@archcutaway) 스타일: 세련된 모던 3D 건축 모형 및 맑은 바다 뷰 (Clean Minimalism)
   style_suffix: >
-    An isometric 3D architectural engineering cross-section cutaway diagram of a massive modern Korean reinforced concrete caisson composite breakwater in the deep ocean,
-    photorealistic cross-section showing detailed soil and seabed rock layers, heavy rubble mound bedding, submerged riprap gravel,
-    perforated slit wave chambers with active water intake, glowing red hydrodynamic pressure vectors and HUD engineering callout lines,
-    dramatic cinematic volumetric lighting, Unreal Engine 5 render, Octane photorealistic, highly detailed physical concrete texture, 8k, professional documentary engineering visual, 16:9
+    Modern minimalist architectural cutaway, sleek clean aesthetic,
+    crystal clear emerald turquoise water, smooth realistic concrete structure,
+    soft cinematic natural studio daylight, elegant ambient occlusion, uncluttered composition,
+    National Geographic documentary quality, Octane 3D render, highly detailed,
+    completely clean visual, no text, no letters, no labels, no watermark, no hud, no arrows, no red lines
 
 tts:
   provider: "typecast"               # typecast(유료 모건 보이스) | edge(무료) | elevenlabs(유료)
@@ -62,7 +85,7 @@ video:
 
 thumbnail:
   font: "assets/fonts/NotoSansCJK-Black.ttc"
-  font_size: 170
+  font_size: 105
 
 youtube:
   privacy: "public"                  # public | unlisted | private

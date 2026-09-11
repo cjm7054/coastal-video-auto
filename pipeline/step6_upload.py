@@ -26,9 +26,19 @@ def upload(script: dict, video: Path, thumb: Path) -> str:
     from googleapiclient.http import MediaFileUpload
     cfg = load_config()
     yt = _service(cfg)
+    is_shorts = cfg.get("current_format") == "shorts"
+    title = script["title"][:90]
+    if is_shorts and "#Shorts" not in title and "#shorts" not in title:
+        title = f"{title} #Shorts"
+    desc = script["description"]
+    if is_shorts and "#Shorts" not in desc and "#shorts" not in desc:
+        desc = f"{desc}\n\n#Shorts #쇼츠"
+
+    tags = list(dict.fromkeys(cfg["youtube"]["default_tags"] + script.get("tags", []) + (["Shorts", "쇼츠"] if is_shorts else [])))[:30]
+
     body = {
-        "snippet": {"title": script["title"][:100], "description": script["description"],
-                    "tags": list(dict.fromkeys(cfg["youtube"]["default_tags"] + script.get("tags", [])))[:30],
+        "snippet": {"title": title, "description": desc,
+                    "tags": tags,
                     "categoryId": cfg["youtube"]["category_id"], "defaultLanguage": "ko"},
         "status": {"privacyStatus": cfg["youtube"]["privacy"], "selfDeclaredMadeForKids": False},
     }
