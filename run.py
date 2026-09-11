@@ -26,8 +26,22 @@ def main():
     ap.add_argument("--job-dir")
     a = ap.parse_args()
 
+    # 포맷 선택: CLI 인자가 없으면 터미널에서 대화형으로 롱폼/쇼츠 선택
     if a.format:
         set_active_format(a.format)
+    elif not a.job_dir and not a.resume:
+        print("\n" + "=" * 60)
+        print("🎬 [OCEAN CODE LAB] 영상 제작 포맷을 선택하세요:")
+        print("  1) 쇼츠   (9:16 세로형 쇼츠, 약 50초, 8장면) [기본값]")
+        print("  2) 롱폼   (16:9 가로형 다큐, 약 3.8분, 26장면)")
+        print("=" * 60)
+        try:
+            choice = input("선택 번호를 입력하세요 (1 또는 2, 엔터시 1): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            choice = "1"
+        chosen_fmt = "longform" if choice == "2" else "shorts"
+        set_active_format(chosen_fmt)
+        log.info(f"선택된 영상 포맷: {'롱폼 (16:9 다큐)' if chosen_fmt == 'longform' else '쇼츠 (9:16 세로)'}")
 
     if a.job_dir:
         job = Path(a.job_dir)

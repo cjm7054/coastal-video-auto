@@ -22,7 +22,9 @@ PROMPT = """당신은 대한민국 해안·항만 토목공학의 본질을 밝�
       "id": 1,
       "narration": "장면 나레이션.",
       "visual_type": "aerial_drone",
-      "image_prompt": "이 장면의 영문 8K 시네마틱 프롬프트 (맑은 에메랄드 바다, 해변, 드론 뷰, 현대적 수중 구조물 등 visual_type에 맞게 작성, 텍스트/화살표 배제).",
+      "image_prompt": "이 장면의 영문 8K 시네마틱 프롬프트 (클린 베이스 이미지: 맑은 에메랄드 바다, 해변, 드론 뷰, 현대적 수중 구조물 등 visual_type에 맞게 작성, 텍스트/화살표 배제).",
+      "clean_prompt": "1차 통과 순수 실사 렌더 프롬프트 (No text, no labels, no arrows, pure 8K photoreal maritime visual)",
+      "info_prompt": "2차 통과 3D 인포그래픽 오버레이 프롬프트 (Semi-transparent 3D force arrows, callout measurement lines, structural cutaway annotation)",
       "motion": true,
       "motion_prompt": "카메라 궤적 및 물리적 시뮬레이션 영문 프롬프트"
     }}
@@ -267,8 +269,74 @@ def generate_script(topic: str, out_dir: Path) -> dict:
         log.warning(f"⚠️ Ruflo Swarm 멀티 에이전트 교차 감수 스킵 (기본 대본 유지): {r_err}")
 
     script["topic"] = topic
-    script["format"] = cfg.get("current_format", "longform")
+    current_fmt = cfg.get("current_format", "longform")
+    script["format"] = current_fmt
     assert len(script["scenes"]) >= 3, "장면 수가 너무 적습니다"
     save_json(out_dir / "script.json", script)
+
+    # =========================================================================
+    # [★ Codex / Google Flow 연동 마크다운 및 프롬프트 시퀀스 자동 생성]
+    # 'OCEAN CODE LAB 쇼츠MD파일' 규격에 맞춰 manifests 및 prompts 디렉터리 동기화
+    # =========================================================================
+    try:
+        manifests_dir = out_dir / "manifests"
+        prompts_dir = out_dir / "prompts"
+        manifests_dir.mkdir(exist_ok=True)
+        prompts_dir.mkdir(exist_ok=True)
+
+        # 1. IMAGE_SEQUENCE.md
+        seq_lines = [
+            f"# OCEAN CODE LAB 영상 시퀀스 매니페스트 ({'쇼츠 (9:16)' if current_fmt == 'shorts' else '롱폼 (16:9)'})",
+            f"- **주제**: {topic}",
+            f"- **제목**: {script.get('title', '')}",
+            f"- **포맷**: {current_fmt} ({'9:16 Vertical 1080x1920' if current_fmt == 'shorts' else '16:9 Landscape 1920x1080'})",
+            f"- **총 장면 수**: {len(script['scenes'])}개\n",
+            "| Scene ID | Keyframe ID | Narration | Visual Type | CLEAN Base Prompt | INFO Overlay Prompt |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- |"
+        ]
+        clean_prompt_lines = [
+            f"# CLEAN KEYFRAME PROMPTS (1차 통과 순수 실사 렌더)\n",
+            f"> 채널: OCEAN CODE LAB | 포맷: {current_fmt}\n",
+            "> 이 프롬프트는 텍스트/화살표가 없는 1차 실사 베이스 렌더용입니다.\n"
+        ]
+        info_prompt_lines = [
+            f"# INFOGRAPHIC KEYFRAME PROMPTS (2차 통과 3D 공학 인포그래픽 오버레이)\n",
+            f"> 채널: OCEAN CODE LAB | 포맷: {current_fmt}\n",
+            "> 1차 CLEAN 베이스 위에 반투명 3D 수치, 파력 벡터, 절단면 치수선을 증강하는 프롬프트입니다.\n"
+        ]
+
+        for sc in script["scenes"]:
+            sid = sc.get("id", 1)
+            sc_id_str = f"S{sid:02d}A"
+            kf_id_str = f"KF-{sid:02d}A"
+            narration = sc.get("narration", "").replace("\n", " ")
+            vtype = sc.get("visual_type", "aerial_drone")
+            base_p = sc.get("clean_prompt") or sc.get("image_prompt", "")
+            info_p = sc.get("info_prompt") or (
+                f"Engineering cutaway overlay, 3D semi-transparent force vectors, flow measurement callouts, technical precision lines, {base_p}"
+            )
+            sc["clean_prompt"] = base_p
+            sc["info_prompt"] = info_p
+
+            seq_lines.append(f"| {sc_id_str} | {kf_id_str} | {narration} | {vtype} | {base_p} | {info_p} |")
+            
+            clean_prompt_lines.append(f"## [{sc_id_str}] {kf_id_str}")
+            clean_prompt_lines.append(f"- **나레이션**: {narration}")
+            clean_prompt_lines.append(f"```text\n{base_p}\n```\n")
+
+            info_prompt_lines.append(f"## [{sc_id_str}] {kf_id_str} (INFO 2nd-pass)")
+            info_prompt_lines.append(f"- **나레이션**: {narration}")
+            info_prompt_lines.append(f"```text\n{info_p}\n```\n")
+
+        (manifests_dir / "IMAGE_SEQUENCE.md").write_text("\n".join(seq_lines), encoding="utf-8")
+        (prompts_dir / "CLEAN_KEYFRAME_PROMPTS.md").write_text("\n".join(clean_prompt_lines), encoding="utf-8")
+        (prompts_dir / "INFOGRAPHIC_KEYFRAME_PROMPTS.md").write_text("\n".join(info_prompt_lines), encoding="utf-8")
+        
+        # 다시 저장하여 clean_prompt, info_prompt 반영
+        save_json(out_dir / "script.json", script)
+        log.info(f"✨ [Codex 연동] 매니페스트 및 프롬프트 파일 저장 완료 ({manifests_dir}, {prompts_dir})")
+    except Exception as ce:
+        log.warning(f"Codex 매니페스트 생성 예외: {ce}")
+
     log.info(f"대본 완료: {script['title']} / 장면 {len(script['scenes'])}개")
     return script
