@@ -83,6 +83,8 @@ def _mp3_duration(mp3: Path) -> float:
 
 def _words_to_cues(words, max_chars=22):
     """단어 타임스탬프를 자막 줄(약 22자)로 묶는다."""
+    if not words:
+        return []
     cues, buf, st = [], [], None
     for s, e, w in words:
         if st is None: st = s
@@ -92,6 +94,33 @@ def _words_to_cues(words, max_chars=22):
         last_e = e
     if buf: cues.append((st, last_e, " ".join(buf)))
     return cues
+
+
+def _sentence_to_fallback_cues(text: str, duration: float, max_chars=20):
+    """단어 타임스탬프가 없을 때 문장을 고르게 분할하여 자막이 100% 나오도록 보증"""
+    words = text.strip().split()
+    if not words:
+        return [(0.0, max(0.5, duration - 0.2), text)]
+    
+    chunks, cur = [], []
+    for w in words:
+        if cur and len(" ".join(cur + [w])) > max_chars:
+            chunks.append(" ".join(cur))
+            cur = []
+        cur.append(w)
+    if cur:
+        chunks.append(" ".join(cur))
+    
+    n = len(chunks)
+    active_dur = max(0.8, duration - 0.3)
+    chunk_dur = active_dur / n
+    cues = []
+    for i, chk in enumerate(chunks):
+        s = i * chunk_dur
+        e = (i + 1) * chunk_dur
+        cues.append((round(s, 2), round(e, 2), chk))
+    return cues
+
 
 
 def _typecast_one(text: str, mp3: Path, cfg: dict):
@@ -322,10 +351,16 @@ def generate_audio(script: dict, out_dir: Path) -> dict:
             words = asyncio.run(_edge_one(spoken_text, mp3, cfg["tts"]["edge_voice"], cfg["tts"]["rate"]))
 
         dur = _mp3_duration(mp3) + 0.4  # 장면 사이 0.4초 여유
-        for s, e, w in _words_to_cues(words):
-            srt_lines.append(f"{idx}\n{_fmt(t0 + s)} --> {_fmt(t0 + e)}\n{w}\n"); idx += 1
+        cues = _words_to_cues(words)
+        if not cues:
+            # 단어 타임스탬프 누락 시 자막 실종 방지: 문장 분할 큐 자동 생성
+            cues = _sentence_to_fallback_cues(display_text, dur - 0.4)
+
+        for s, e, w in cues:
+            srt_lines.append(f"{idx}\n{_fmt(t0 + s)} --> {_fmt(t0 + e)}\n{w}\n")
+            idx += 1
         timeline.append({"id": sc["id"], "mp3": str(mp3), "start": t0, "duration": dur})
-        log.info(f"TTS {sc['id']}: {dur:.1f}s")
+        log.info(f"TTS {sc['id']}: {dur:.1f}s (자막 {len(cues)}개 라인 보증)")
         t0 += dur
     (out_dir / "subtitles.srt").write_text("\n".join(srt_lines), encoding="utf-8")
     log.info(f"총 길이 {t0/60:.1f}분")

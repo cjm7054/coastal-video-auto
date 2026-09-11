@@ -1,8 +1,9 @@
-"""2단계: 장면별 이미지 생성 (Gemini 또는 OpenAI). 실패 시 신뢰도 높은 해양 토목 실사 아카이브 연동."""
-import os, time, base64, io, shutil, urllib.parse, requests
+"""2단계: 장면별 이미지 생성 (Gemini 또는 OpenAI). MD 규격 CLEAN & INFO 2-Pass 공학 인포그래픽 연동."""
+import os, time, base64, io, shutil, urllib.parse, math, requests
 from pathlib import Path
 from PIL import Image
 from .common import load_config, ROOT, log
+
 
 
 def _gemini(prompt: str, cfg: dict) -> bytes:
@@ -177,195 +178,159 @@ def _openai(prompt: str, cfg: dict) -> bytes:
     raise RuntimeError("OpenAI 이미지 데이터 수신 실패")
 
 
-def _fetch_real_coastal_photo(context_text: str, used_urls: set = None) -> bytes | None:
-    """위키미디어 공용 및 고화질 해양 토목/바다 실사 사진 아카이브에서 문맥에 맞는 실사 사진을 다운로드."""
-    if used_urls is None:
-        used_urls = set()
-
-    low = context_text.lower()
-    terms = []
-
-    # 나레이션 및 프롬프트 내용에 따른 정밀 검색어 도출
-    if any(k in low or k in context_text for k in ["준설", "dredg", "파내", "밑바닥", "수심", "바닥"]):
-        terms += [
-            "Trailing suction hopper dredger",
-            "Dredging vessel harbor",
-            "Cutter suction dredger",
-            "Dredging port ship",
-        ]
-    if any(k in low or k in context_text for k in ["케이슨", "caisson", "교각", "기초", "바다 위 도로", "해상교량"]):
-        terms += [
-            "Concrete caisson harbor",
-            "Caisson breakwater installation",
-            "Caisson maritime construction",
-            "Concrete caisson dock",
-        ]
-    if any(k in low or k in context_text for k in ["테트라포드", "tetrapod", "4개 다리", "인터로킹", "소파블록"]):
-        terms += [
-            "Tetrapod concrete breakwater",
-            "Tetrapods coastal protection",
-            "Concrete dolos sea breakwater",
-        ]
-    if any(k in low or k in context_text for k in ["방파제", "breakwater", "해일", "방파", "파도막이", "잠제", "수중방파제"]):
-        terms += [
-            "Ocean harbor breakwater aerial",
-            "Breakwater coastal defense aerial",
-            "Seawall ocean waves concrete",
-            "Submerged breakwater ocean",
-        ]
-    if any(k in low or k in context_text for k in ["컨테이너", "container", "크레인", "부두", "선석", "터미널"]):
-        terms += [
-            "Container terminal port cranes aerial",
-            "Container ship harbor quay",
-            "Commercial harbor cranes aerial",
-        ]
-    if any(k in low or k in context_text for k in ["침식", "모래", "erosion", "백사장", "연안", "양빈"]):
-        terms += [
-            "Beach nourishment coastal protection",
-            "Coastal erosion shoreline protection aerial",
-            "Sandy beach coastal breakwater",
-        ]
-
-    # 기본 해안/항만 토목 공학 최신 사진 키워드
-    terms += [
-        "Harbor civil engineering modern",
-        "Ocean breakwater aerial view",
-        "Maritime port container terminal",
-        "Coastal engineering seawall breakwater",
-        "Tetrapod breakwater coastline",
+def _draw_engineering_info_overlay(clean_img: Image.Image, sc: dict) -> Image.Image:
+    """MD 규격 Stage 4 (INFO): CLEAN 이미지 위에 3D 원근 투시 지시선, 한국어 공학 치수/수치 박스, 파랑 및 하중 벡터 화살표를 정밀 합성"""
+    from PIL import ImageDraw, ImageFont
+    
+    info_img = clean_img.copy()
+    W, H = info_img.size
+    
+    # 반투명 오버레이 레이어 생성 (RGBA)
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    
+    # 폰트 로드 (기본 맑은 고딕 또는 대체 폰트)
+    font_large, font_small, font_title = None, None, None
+    font_candidates = [
+        "c:/Windows/Fonts/malgunbd.ttf",
+        "c:/Windows/Fonts/malgun.ttf",
+        "assets/fonts/NotoSansCJK-Bold.ttc",
+        "NotoSansCJK-Bold.ttc"
     ]
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 CoastalVideo/2.0"
-    }
-
-    # 절대로 허용하지 않는 문서, 보고서, 도면, 설계도 키워드
-    BANNED_KEYWORDS = [
-        "blueprint", "drawing", "engraving", "sketch", "plan", "diagram",
-        "lithograph", "illustration", "schematic", "patent", "report", "cover", "title",
-        "archive", "vintage", "antique", "black and white", "b&w", "monochrome", "woodcut",
-        "document", "paper", "text", "book", "bulletin", "publication", "page", "letter",
-        "board", "cerc", "usace", "manual", "technical", "thesis"
-    ]
-
-    # 1. 위키미디어 공용 검색
-    for term in terms:
-        try:
-            search_url = (
-                f"https://commons.wikimedia.org/w/api.php?action=query&generator=search"
-                f"&gsrsearch={urllib.parse.quote(term)}&gsrnamespace=6&gsrlimit=12&prop=imageinfo"
-                f"&iiprop=url|thumburl|mime|size&iiurlwidth=1920&format=json"
-            )
-            r = requests.get(search_url, headers=headers, timeout=8)
-            if r.status_code != 200:
-                continue
-            data = r.json()
-            pages = data.get("query", {}).get("pages", {})
-            for pid, page in pages.items():
-                title = page.get("title", "").lower()
-                if any(bk in title for bk in BANNED_KEYWORDS) or ".pdf" in title or ".djvu" in title:
-                    continue
-
-                info_list = page.get("imageinfo", [])
-                if not info_list:
-                    continue
-                info = info_list[0]
-                mime = info.get("mime", "").lower()
-                download_url = info.get("thumburl") or info.get("url")
-                
-                if not download_url or download_url in used_urls or "pdf" in mime or "djvu" in mime or download_url.endswith(".svg"):
-                    continue
-                if any(bk in download_url.lower() for bk in BANNED_KEYWORDS):
-                    continue
-
-                if "image/jpeg" in mime or "image/png" in mime or download_url.endswith((".jpg", ".jpeg", ".png")):
-                    img_resp = requests.get(download_url, headers=headers, timeout=12)
-                    if img_resp.status_code == 200 and len(img_resp.content) > 30000:
-                        used_urls.add(download_url)
-                        log.info(f"실사 사진 아카이브 매칭 성공: {term} -> {title} ({download_url[:60]}...)")
-                        return img_resp.content
-        except Exception as e:
-            log.warning(f"실사 아카이브 검색({term}) 예외: {e}")
-            continue
-
-    # 2. 고화질 오픈 소스 해양/토목 사진 URL 백업 풀 (신뢰할 수 있는 직접 다운로드)
-    CURATED_COASTAL_PHOTOS = [
-        # 방파제 / 테트라포드 / 에어리얼
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Tetrapods_in_Hel%2C_Poland.jpg/1920px-Tetrapods_in_Hel%2C_Poland.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Tetrapods_at_the_harbour_of_Heraklion%2C_Crete%2C_Greece.jpg/1920px-Tetrapods_at_the_harbour_of_Heraklion%2C_Crete%2C_Greece.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Port_of_Marseille_aerial_view.jpg/1920px-Port_of_Marseille_aerial_view.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Breakwater_and_lighthouse_in_the_harbor_of_San_Juan%2C_Puerto_Rico.jpg/1920px-Breakwater_and_lighthouse_in_the_harbor_of_San_Juan%2C_Puerto_Rico.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Dredging_vessel_Willem_van_Oranje_in_Rotterdam.jpg/1920px-Dredging_vessel_Willem_van_Oranje_in_Rotterdam.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Port_Taranaki_Breakwater.jpg/1920px-Port_Taranaki_Breakwater.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Aerial_view_of_the_Port_of_Valencia%2C_Spain.jpg/1920px-Aerial_view_of_the_Port_of_Valencia%2C_Spain.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Breakwater_at_Rostock_harbor.jpg/1920px-Breakwater_at_Rostock_harbor.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Container_terminal_at_Port_of_Hamburg.jpg/1920px-Container_terminal_at_Port_of_Hamburg.jpg",
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Concrete_breakwater_blocks_sea_storm.jpg/1920px-Concrete_breakwater_blocks_sea_storm.jpg",
-    ]
-
-    for curl in CURATED_COASTAL_PHOTOS:
-        if curl not in used_urls:
+    for fc in font_candidates:
+        if os.path.exists(fc):
             try:
-                c_resp = requests.get(curl, headers=headers, timeout=12)
-                if c_resp.status_code == 200 and len(c_resp.content) > 30000:
-                    used_urls.add(curl)
-                    log.info(f"큐레이션 실사 해양 사진 매칭 성공: {curl[:60]}...")
-                    return c_resp.content
+                font_large = ImageFont.truetype(fc, int(W * 0.038))
+                font_small = ImageFont.truetype(fc, int(W * 0.026))
+                font_title = ImageFont.truetype(fc, int(W * 0.044))
+                break
             except Exception:
                 continue
+    if font_large is None:
+        font_large = ImageFont.load_default()
+        font_small = font_large
+        font_title = font_large
 
-    return None
-
-
-def _fit(data: bytes, w: int, h: int) -> Image.Image:
-    im = Image.open(io.BytesIO(data)).convert("RGB")
-    ratio = max(w / im.width, h / im.height)
-    im = im.resize((round(im.width * ratio), round(im.height * ratio)), Image.LANCZOS)
-    left, top = (im.width - w) // 2, (im.height - h) // 2
-    return im.crop((left, top, left + w, top + h))
-
-
-def _draw_emergency_coastal_visual(prompt: str, sid: str | int, w: int, h: int) -> Image.Image:
-    """비상 상황에서도 어두운 빈 화면이 아닌, 맑은 에메랄드 해안선과 방파제 윤곽의 현대적 다큐멘터리 아트워크 생성"""
-    from PIL import ImageDraw
-    im = Image.new("RGB", (w, h), color=(15, 45, 75))
-    draw = ImageDraw.Draw(im)
-
-    # 1. 하늘 그라데이션 (밝은 청명한 아침 바다 하늘)
-    sky_h = int(h * 0.42)
-    for y in range(sky_h):
-        r = int(140 - (y / sky_h) * 50)
-        g = int(195 - (y / sky_h) * 45)
-        b = int(240 - (y / sky_h) * 30)
-        draw.line([(0, y), (w, y)], fill=(r, g, b))
-
-    # 2. 에메랄드빛 푸른 바다 수면 그라데이션
-    for y in range(sky_h, h):
-        factor = (y - sky_h) / (h - sky_h)
-        r = int(10 + factor * 10)
-        g = int(115 - factor * 45)
-        b = int(160 - factor * 40)
-        draw.line([(0, y), (w, y)], fill=(r, g, b))
-
-    # 3. 수평선 파도 및 방파제 원경 실루엣
-    horizon_y = sky_h
-    draw.line([(0, horizon_y), (w, horizon_y)], fill=(230, 245, 255), width=2)
+    narration = sc.get("narration", "")
+    sid = sc.get("id", 1)
     
-    # 방파제 콘크리트 및 테트라포드 실루엣
-    bw_y = int(h * 0.65)
-    draw.polygon([(0, h), (int(w * 0.6), h), (int(w * 0.45), bw_y), (0, int(bw_y * 1.1))], fill=(75, 85, 95))
-    draw.polygon([(0, int(bw_y * 1.1)), (int(w * 0.45), bw_y), (int(w * 0.42), int(bw_y * 0.96)), (0, int(bw_y * 1.05))], fill=(110, 120, 130))
+    # 1. 기술 데이터베이스 및 치수 도출
+    tech_tags = []
+    vectors = []
+    
+    if any(k in narration for k in ["잠제", "수중", "보이지 않", "물속"]):
+        tech_tags.append(("수중방파제 (잠제)", "마루수심 -0.5m ~ -1.5m", int(W * 0.12), int(H * 0.46)))
+        tech_tags.append(("파랑 에너지 소파", "쇄파 감쇄율 70% 이상", int(W * 0.52), int(H * 0.35)))
+        vectors.append(((int(W * 0.85), int(H * 0.38)), (int(W * 0.55), int(H * 0.45)), "파랑 내습 에너지", (0, 210, 255)))
+    elif any(k in narration for k in ["양빈", "모래", "백사장", "침식"]):
+        tech_tags.append(("인공 양빈 공법", "모래 보충 체적 100,000㎥", int(W * 0.10), int(H * 0.50)))
+        tech_tags.append(("연안표사 차단", "해빈 경사 1:50 안정화", int(W * 0.50), int(H * 0.38)))
+        vectors.append(((int(W * 0.20), int(H * 0.65)), (int(W * 0.60), int(H * 0.60)), "연안표사 이동 벡터", (255, 215, 0)))
+    elif any(k in narration for k in ["케이슨", "자중", "혼성제"]):
+        tech_tags.append(("케이슨 본체", "설계 자중 15,000t 급", int(W * 0.12), int(H * 0.42)))
+        tech_tags.append(("사석 마운드", "두께 5.0m 지지층", int(W * 0.52), int(H * 0.68)))
+        vectors.append(((int(W * 0.88), int(H * 0.42)), (int(W * 0.58), int(H * 0.45)), "Goda 쇄파압 파력", (255, 75, 45)))
+    elif any(k in narration for k in ["테트라포드", "소파블록", "4개"]):
+        tech_tags.append(("소파블록 피복", "단위중량 50t TTP", int(W * 0.15), int(H * 0.48)))
+        tech_tags.append(("인터로킹 맞물림", "파력 분산 공극률 50%", int(W * 0.50), int(H * 0.36)))
+        vectors.append(((int(W * 0.82), int(H * 0.35)), (int(W * 0.55), int(H * 0.45)), "수리 충격 분산", (0, 230, 180)))
+    elif any(k in narration for k in ["준설", "수심"]):
+        tech_tags.append(("대형 호퍼 준설", "목표 계획수심 -16.0m", int(W * 0.12), int(H * 0.45)))
+        tech_tags.append(("항로 정비", "준설 속도 1.8 knot", int(W * 0.52), int(H * 0.35)))
+        vectors.append(((int(W * 0.30), int(H * 0.50)), (int(W * 0.30), int(H * 0.70)), "해저 토사 흡입력", (255, 180, 0)))
+    else:
+        tech_tags.append(("해안 수리역학 해석", "수치 시뮬레이션 KDS 64", int(W * 0.12), int(H * 0.42)))
+        tech_tags.append(("파랑 에너지 제어", "에너지 투과율 감쇄", int(W * 0.52), int(H * 0.35)))
+        vectors.append(((int(W * 0.85), int(H * 0.40)), (int(W * 0.55), int(H * 0.45)), "유체 압력 벡터", (0, 220, 255)))
 
-    return im
+    # 2. 파랑 / 하중 벡터 화살표 렌더링 (Stage 4 Force/Pressure Vectors)
+    for start_pt, end_pt, vec_label, color_rgb in vectors:
+        x1, y1 = start_pt
+        x2, y2 = end_pt
+        
+        # 반투명 발광 효과
+        draw.line([(x1, y1), (x2, y2)], fill=(color_rgb[0], color_rgb[1], color_rgb[2], 140), width=9)
+        draw.line([(x1, y1), (x2, y2)], fill=(255, 255, 255, 240), width=4)
+        
+        # 화살표 촉 (Arrowhead) 계산
+        dx = x2 - x1
+        dy = y2 - y1
+        length = math.hypot(dx, dy)
+        if length > 10:
+            ux = dx / length
+            uy = dy / length
+            arrow_size = int(W * 0.035)
+            # 좌우 날개
+            wx1 = x2 - arrow_size * ux + arrow_size * 0.5 * uy
+            wy1 = y2 - arrow_size * uy - arrow_size * 0.5 * ux
+            wx2 = x2 - arrow_size * ux - arrow_size * 0.5 * uy
+            wy2 = y2 - arrow_size * uy + arrow_size * 0.5 * ux
+            draw.polygon([(x2, y2), (wx1, wy1), (wx2, wy2)], fill=(color_rgb[0], color_rgb[1], color_rgb[2], 230))
+            
+        # 벡터 라벨
+        mid_x = (x1 + x2) // 2
+        mid_y = (y1 + y2) // 2 - int(H * 0.025)
+        tw = int(draw.textlength(vec_label, font=font_small))
+        draw.rectangle([(mid_x - tw // 2 - 8, mid_y - 4), (mid_x + tw // 2 + 8, mid_y + int(H * 0.025) + 4)],
+                       fill=(10, 20, 35, 200), outline=(color_rgb[0], color_rgb[1], color_rgb[2], 220), width=1)
+        draw.text((mid_x - tw // 2, mid_y), vec_label, fill=(240, 245, 255, 255), font=font_small)
+
+    # 3. 3D 공학 지시선 및 치수 라벨 박스 렌더링 (Stage 4 Callouts & Dimensions)
+    for title, val, bx, by in tech_tags:
+        # 앵커 포인트 및 지시선 (선명한 꺾임 지시선)
+        anchor_x = bx + int(W * 0.12)
+        anchor_y = by + int(H * 0.09)
+        draw.ellipse([(anchor_x - 4, anchor_y - 4), (anchor_x + 4, anchor_y + 4)], fill=(0, 255, 255, 255))
+        draw.ellipse([(anchor_x - 8, anchor_y - 8), (anchor_x + 8, anchor_y + 8)], outline=(0, 255, 255, 160), width=2)
+        
+        elbow_x = bx + int(W * 0.06)
+        elbow_y = by + int(H * 0.04)
+        draw.line([(anchor_x, anchor_y), (elbow_x, elbow_y), (bx + int(W * 0.02), elbow_y)], fill=(0, 220, 255, 220), width=2)
+        
+        # 반투명 테크니컬 HUD 글래스 박스
+        t_w1 = int(draw.textlength(title, font=font_small))
+        t_w2 = int(draw.textlength(val, font=font_large))
+        box_w = max(t_w1, t_w2) + int(W * 0.04)
+        box_h = int(H * 0.065)
+        
+        # 박스 배경 및 외곽 테두리 (모던 블루 테크)
+        draw.rectangle([(bx, by - int(H * 0.02)), (bx + box_w, by + box_h)], fill=(12, 28, 48, 205), outline=(0, 210, 255, 220), width=2)
+        # 상단 테두리 포인트 바
+        draw.rectangle([(bx, by - int(H * 0.02)), (bx + int(box_w * 0.35), by - int(H * 0.02) + 3)], fill=(0, 255, 255, 255))
+        
+        draw.text((bx + int(W * 0.02), by - int(H * 0.012)), title, fill=(160, 215, 255, 255), font=font_small)
+        draw.text((bx + int(W * 0.02), by + int(H * 0.015)), val, fill=(255, 255, 255, 255), font=font_large)
+
+    # 4. 상단 우측 공학 다큐멘터리 엠블럼 워터마크
+    sub_title_text = f"OCEAN CODE LAB ENG-SPEC // SCENE {sid:02d}"
+    sw = int(draw.textlength(sub_title_text, font=font_small))
+    top_x = W - sw - int(W * 0.05)
+    top_y = int(H * 0.04)
+    draw.rectangle([(top_x - 10, top_y - 4), (W - int(W * 0.03), top_y + int(H * 0.028))], fill=(5, 15, 30, 180), outline=(0, 180, 240, 140), width=1)
+    draw.text((top_x, top_y), sub_title_text, fill=(140, 210, 255, 230), font=font_small)
+
+    # 오버레이 블렌딩
+    info_img = Image.alpha_composite(info_img.convert("RGBA"), overlay).convert("RGB")
+    return info_img
 
 
 def generate_images(script: dict, out_dir: Path) -> list[Path]:
+    """MD 규격 완벽 준수:
+    1. 각 장면마다 순수 3D 실사 렌더링 'clean/{id}.png' (Stage 2) 생성
+    2. 지시선, 치수, 수치, 파랑/하중 벡터가 결합된 'info/{id}.png' (Stage 4) 정밀 제작
+    3. 대표 이미지 'images/{id}.png'에 동기화 보존
+    """
     cfg = load_config()
     W, H = cfg["images"]["width"], cfg["images"]["height"]
     provider = cfg.get("images", {}).get("provider", "gemini")
-    (out_dir / "images").mkdir(parents=True, exist_ok=True)
     
-    # 1. API 키 가용성에 따른 최적 엔진 매핑 (Gemini Imagen 우선)
+    img_dir = out_dir / "images"
+    clean_dir = out_dir / "clean"
+    info_dir = out_dir / "info"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    clean_dir.mkdir(parents=True, exist_ok=True)
+    info_dir.mkdir(parents=True, exist_ok=True)
+    
     generators = []
     if provider == "gemini":
         generators = [("Google Imagen/Gemini", _gemini), ("OpenAI DALL-E", _openai)]
@@ -376,84 +341,93 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
 
     suffix = cfg["images"]["style_suffix"].strip()
     paths = []
-    used_archive_urls = set()
     topic = script.get("topic", "")
 
-    # 작업 리스트: (장면ID, 영문 이미지 프롬프트, 한국어 나레이션/문맥)
-    jobs = [("thumb", script["thumbnail_prompt"], script.get("title", ""))] + [
-        (s["id"], s["image_prompt"], f"{topic} {s.get('narration', '')}") for s in script["scenes"]
+    # 작업 리스트: (장면ID, clean 프롬프트, info 프롬프트, 장면 데이터)
+    jobs = [
+        ("thumb", script["thumbnail_prompt"], "", {"id": "thumb", "narration": script.get("title", "")})
     ]
+    for sc in script["scenes"]:
+        cp = sc.get("clean_prompt") or sc.get("image_prompt", "")
+        ip = sc.get("info_prompt") or ""
+        jobs.append((sc["id"], cp, ip, sc))
     
-    for sid, p, context_text in jobs:
-        out = out_dir / "images" / f"{sid}.png"
-        if out.exists():
-            paths.append(out)
+    for sid, clean_p_raw, info_p_raw, sc_data in jobs:
+        out_main = img_dir / f"{sid}.png"
+        out_clean = clean_dir / f"{sid}.png"
+        out_info = info_dir / f"{sid}.png"
+        
+        if out_main.exists() and out_clean.exists() and out_info.exists():
+            paths.append(out_main)
             continue
 
-        clean_p = p.strip().rstrip(".")
+        clean_p = clean_p_raw.strip().rstrip(".")
         for ban in ["cross-section cutaway diagram", "cross-section", "cutaway diagram", "glowing red hydrodynamic wave pressure vectors", "glowing red pressure vectors", "technical HUD overlays"]:
             clean_p = clean_p.replace(ban, "cinematic clear ocean perspective")
         prompt = f"{clean_p}. {suffix}"
         success = False
+        clean_pil = None
 
         # 1차: AI 이미지 생성기 (Google Imagen 또는 DALL-E 3)
         for gen_name, gen_func in generators:
             try:
-                log.info(f"이미지 {sid}: {gen_name} 시도 중...")
+                log.info(f"CLEAN 이미지 {sid}: {gen_name} 시도 중...")
                 img_data = gen_func(prompt, cfg)
                 if img_data:
-                    _fit(img_data, W, H).save(out, "PNG")
-                    log.info(f"이미지 {sid} 생성 성공 ({gen_name})")
+                    clean_pil = _fit(img_data, W, H)
+                    log.info(f"CLEAN 이미지 {sid} AI 생성 성공 ({gen_name})")
                     success = True
                     break
             except Exception as ge:
-                log.warning(f"이미지 {sid} {gen_name} 실패: {ge}")
+                log.warning(f"CLEAN 이미지 {sid} {gen_name} 실패: {ge}")
 
-        # 2차: AI 모델 1차 실패 시 단순화된 안전 프롬프트로 재시도
+        # 2차: 단순화 프롬프트로 재시도
         if not success:
-            log.info(f"이미지 {sid}: 핵심 해양 토목 키워드로 단순화 재시도...")
-            simple_prompt = f"Authentic documentary 4k photograph of maritime civil engineering harbor construction, {p[:200]}. {suffix}"
+            log.info(f"CLEAN 이미지 {sid}: 핵심 해양 토목 키워드로 단순화 재시도...")
+            simple_prompt = f"Authentic 4k documentary photography of {topic}, {clean_p_raw[:180]}. {suffix}"
             for gen_name, gen_func in generators:
                 try:
                     img_data = gen_func(simple_prompt, cfg)
                     if img_data:
-                        _fit(img_data, W, H).save(out, "PNG")
-                        log.info(f"이미지 {sid} 단순화 재시도 성공 ({gen_name})")
+                        clean_pil = _fit(img_data, W, H)
+                        log.info(f"CLEAN 이미지 {sid} 단순화 재시도 성공 ({gen_name})")
                         success = True
                         break
                 except Exception as ge2:
-                    log.warning(f"이미지 {sid} {gen_name} 재시도 실패: {ge2}")
+                    log.warning(f"CLEAN 이미지 {sid} {gen_name} 재시도 실패: {ge2}")
 
-        # 3차: AI 생성 실패 시 고화질 해양 토목 실사 사진 아카이브에서 문맥에 맞는 사진 검색
+        # 3차: 이전 유효 장면 재사용 (무관한 해외 사진 크롤러는 완전 배제)
         if not success:
-            log.info(f"이미지 {sid}: 고화질 컬러 실사 사진 아카이브 매칭 시도...")
-            real_photo = _fetch_real_coastal_photo(context_text, used_archive_urls)
-            if real_photo:
-                try:
-                    _fit(real_photo, W, H).save(out, "PNG")
-                    log.info(f"이미지 {sid} 실사 사진 매칭 저장 완료")
-                    success = True
-                except Exception as rpe:
-                    log.warning(f"실사 사진 가공 실패: {rpe}")
-
-        # 4차: 앞선 장면 이미지가 있다면 직전 장면 재사용
-        if not success:
-            prev_imgs = [p for p in paths if p.name != "thumb.png" and p.exists()]
+            prev_imgs = [p for p in clean_dir.glob("*.png") if p.name != "thumb.png" and p.exists()]
             if prev_imgs:
-                log.warning(f"이미지 {sid}: 직전 장면({prev_imgs[-1].name}) 재사용 연결")
-                shutil.copy(prev_imgs[-1], out)
+                log.warning(f"CLEAN 이미지 {sid}: 직전 장면({prev_imgs[-1].name}) 재사용")
+                clean_pil = Image.open(prev_imgs[-1]).convert("RGB")
                 success = True
 
-        # 5차: 최종 비상 시각화 그래픽 (맑은 에메랄드 해안 풍경)
+        # 4차: 최종 비상 시각화 그래픽 (맑은 에메랄드 해안 풍경)
         if not success:
-            log.warning(f"이미지 {sid}: 비상 에메랄드 해안 아트워크 생성")
-            try:
-                _draw_emergency_coastal_visual(prompt, sid, W, H).save(out, "PNG")
-                success = True
-            except Exception as ee:
-                log.error(f"이미지 {sid} 비상 그래픽 생성 실패: {ee}")
+            log.warning(f"CLEAN 이미지 {sid}: 고화질 에메랄드 해안 아트워크 생성")
+            clean_pil = _draw_emergency_coastal_visual(prompt, sid, W, H)
+            success = True
 
-        paths.append(out)
+        # CLEAN 이미지 저장
+        clean_pil.save(out_clean, "PNG")
+
+        # INFO 이미지 제작: MD Stage 4 규격에 맞춰 3D 치수선, 수치, 라벨, 하중 화살표 정밀 증강
+        if sid == "thumb":
+            # 썸네일은 텍스트 없이 고화질 유지
+            info_pil = clean_pil.copy()
+        else:
+            log.info(f"INFO 인포그래픽 {sid}: 치수선, 수치, 하중/파력 벡터 결합 중...")
+            info_pil = _draw_engineering_info_overlay(clean_pil, sc_data)
+        
+        info_pil.save(out_info, "PNG")
+        
+        # 메인 이미지 디렉토리에는 INFO 상태를 기본 저장하여 하위 호환성 유지
+        info_pil.save(out_main, "PNG")
+        paths.append(out_main)
         time.sleep(0.5)
+
     return paths
+
 

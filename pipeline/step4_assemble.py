@@ -60,6 +60,13 @@ def build_scene(i: int, sc: dict, out_dir: Path, tmp: Path, motion_clips: dict, 
     strength = cfg["video"]["parallax_strength"]
     sid, dur = sc["id"], sc["duration"]
     img = out_dir / "images" / f"{sid}.png"
+    clean_img = out_dir / "clean" / f"{sid}.png"
+    info_img = out_dir / "info" / f"{sid}.png"
+    
+    # CLEAN 이미지가 없으면 기본 img 사용
+    src_clean_path = clean_img if clean_img.exists() else img
+    src_info_path = info_img if info_img.exists() else None
+    
     silent = tmp / f"{sid}_v.mp4"
     
     # Google Flow 클립 또는 Veo 모션 클립 우선 적용
@@ -76,8 +83,8 @@ def build_scene(i: int, sc: dict, out_dir: Path, tmp: Path, motion_clips: dict, 
         _fit_video(clip_src, silent, W, H, fps, dur)
         log.info(f"장면 {sid}: Google Flow 비디오 클립 적용 ({dur:.1f}s 싱크)")
     else:
-        render_parallax(img, dur, silent, fps=fps, mode=i % 6, strength=strength)
-        log.info(f"장면 {sid}: 3D 시네마틱 무빙 {dur:.1f}s (모드 {i % 6})")
+        render_parallax(src_clean_path, dur, silent, fps=fps, mode=i % 6, strength=strength, info_img_path=src_info_path)
+        log.info(f"장면 {sid}: 3D CLEAN-to-INFO 공학 모션 렌더 {dur:.1f}s (모드 {i % 6})")
 
     final = tmp / f"{sid}.mp4"
     _mux_audio(silent, Path(sc["mp3"]), dur, final)

@@ -51,24 +51,37 @@ def render_dust(duration: float, W: int, H: int, out: Path, fps=24, n=110, seed=
 
 
 def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
-                    strength=0.08):
+                    strength=0.08, info_img_path: Path | None = None):
     """신비한 건축사전식 고화질 시네마틱 3D 카메라 워킹 엔진 (GPU 불필요, 비용 0원).
-    - Mode 0: [360도 오비탈 회전 드론 뷰 (360° Orbital Drone View)] - 구조물 주위를 궤도 회전하며 회전 각도와 줌을 동시에 전개
-    - Mode 1: [초고고도 수직 상승 크레인 샷 (Giant Crane Vertical Tilt-Up)] - 기초 사석 마운드에서 아파트 10층 상판까지 수직 비상
-    - Mode 2: [FPV 드론 다이브 급강하 (FPV Drone Dive & Flare)] - 고공에서 케이슨 유공벽/소파블록 전면으로 속도감 있게 급강하
-    - Mode 3: [광활한 해안선 수평 트래킹 헬리캠 (Horizon Coastal Tracking)] - 수평선을 가로지르며 방파제 전체 전경을 유려하게 훑음
-    - Mode 4: [크레인 수직 하강 & 투시도 포커스 (Crane Tilt-Down & Focus)] - 수면 상부에서 수중 기초 암반층으로 수직 하강
-    - Mode 5: [다이내믹 360도 반경 롤링 패닝 (360° Arc Pan & Roll)] - 완만한 회전 궤적과 광각 돌리 줌 결합
+    - MD Stage 6 규격 지원: CLEAN 실사 이미지에서 시작하여 0.4초 이후 3D 지시선, 치수, 하중 화살표(INFO)가 유려하게 떠오르는 트랜지션 연출
+    - Mode 0: [360도 오비탈 회전 드론 뷰 (360° Orbital Drone View)]
+    - Mode 1: [초고고도 수직 상승 크레인 샷 (Giant Crane Vertical Tilt-Up)]
+    - Mode 2: [FPV 드론 다이브 급강하 (FPV Drone Dive & Flare)]
+    - Mode 3: [광활한 해안선 수평 트래킹 헬리캠 (Horizon Coastal Tracking)]
+    - Mode 4: [크레인 수직 하강 & 투시도 포커스 (Crane Tilt-Down & Focus)]
+    - Mode 5: [다이내믹 360도 반경 롤링 패닝 (360° Arc Pan & Roll)]
     """
     import cv2
-    img = Image.open(img_path).convert("RGB")
-    W, H = img.size
+    clean_img = Image.open(img_path).convert("RGB")
+    W, H = clean_img.size
     
     # 회전 및 고배율 무빙 시 여백이 보이지 않도록 캔버스를 1.75배로 충분히 확장
     pad = 1.75
     big_w, big_h = int(W * pad), int(H * pad)
-    big = img.resize((big_w, big_h), Image.LANCZOS)
-    src = np.array(big)[:, :, ::-1]  # BGR for OpenCV
+    big_clean = clean_img.resize((big_w, big_h), Image.LANCZOS)
+    src_clean = np.array(big_clean)[:, :, ::-1]  # BGR for OpenCV
+    
+    # INFO 타겟 이미지가 있을 경우 동일 캔버스로 준비
+    src_info = None
+    if info_img_path and Path(info_img_path).exists():
+        try:
+            info_img = Image.open(info_img_path).convert("RGB")
+            big_info = info_img.resize((big_w, big_h), Image.LANCZOS)
+            src_info = np.array(big_info)[:, :, ::-1]
+        except Exception as ie:
+            log.warning(f"INFO 이미지 로드 실패 ({ie}) → CLEAN 단독 모션")
+    
+    src = src_clean
     
     n = int(duration * fps)
     cmd = ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}", "-r", str(fps),
@@ -146,10 +159,22 @@ def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
         cx = cx_base + cur_dx
         cy = cy_base + cur_dy
         
-        x1 = max(0, min(big_w - crop_w, int(cx - crop_w / 2)))
-        y1 = max(0, min(big_h - crop_h, int(cy - crop_h / 2)))
-        
-        cropped = src[y1:y1 + crop_h, x1:x1 + crop_w]
+        # MD Stage 6 규격: 0.0~0.5초 순수 CLEAN 유지 후, 0.5~2.2초에 걸쳐 INFO 레이어(치수, 지시선, 화살표)가 부드럽게 페이드인 안착
+        current_time = t * duration
+        if src_info is not None:
+            if current_time < 0.5:
+                blend_src = src_clean
+            elif current_time < 2.2:
+                alpha = (current_time - 0.5) / 1.7
+                # 부드러운 S-커브 가중치
+                alpha_smooth = 0.5 - 0.5 * math.cos(math.pi * alpha)
+                blend_src = cv2.addWeighted(src_clean, 1.0 - alpha_smooth, src_info, alpha_smooth, 0)
+            else:
+                blend_src = src_info
+        else:
+            blend_src = src_clean
+
+        cropped = blend_src[y1:y1 + crop_h, x1:x1 + crop_w]
         
         # 360도 회전 / 뱅크 롤링 앵글 적용
         if abs(angle) > 0.01:
