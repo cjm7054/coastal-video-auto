@@ -189,38 +189,6 @@ def _fit(data: bytes, w: int, h: int) -> Image.Image:
     return im.crop((left, top, left + w, top + h))
 
 
-def _draw_emergency_coastal_visual(prompt: str, sid: str | int, w: int, h: int) -> Image.Image:
-    """API 할당량 초과 비상 상황에서도 맑은 에메랄드 해안선과 방파제 윤곽의 현대적 다큐멘터리 아트워크 생성"""
-    from PIL import ImageDraw
-    im = Image.new("RGB", (w, h), color=(15, 45, 75))
-    draw = ImageDraw.Draw(im)
-
-    # 1. 하늘 그라데이션 (밝은 청명한 아침 바다 하늘)
-    sky_h = int(h * 0.42)
-    for y in range(sky_h):
-        r = int(140 - (y / sky_h) * 50)
-        g = int(195 - (y / sky_h) * 45)
-        b = int(240 - (y / sky_h) * 30)
-        draw.line([(0, y), (w, y)], fill=(r, g, b))
-
-    # 2. 에메랄드빛 푸른 바다 수면 그라데이션
-    for y in range(sky_h, h):
-        factor = (y - sky_h) / (h - sky_h)
-        r = int(10 + factor * 10)
-        g = int(115 - factor * 45)
-        b = int(160 - factor * 40)
-        draw.line([(0, y), (w, y)], fill=(r, g, b))
-
-    # 3. 수평선 파도 및 방파제 원경 실루엣
-    horizon_y = sky_h
-    draw.line([(0, horizon_y), (w, horizon_y)], fill=(230, 245, 255), width=2)
-    
-    # 방파제 콘크리트 및 테트라포드 실루엣
-    bw_y = int(h * 0.65)
-    draw.polygon([(0, h), (int(w * 0.6), h), (int(w * 0.45), bw_y), (0, int(bw_y * 1.1))], fill=(75, 85, 95))
-    draw.polygon([(0, int(bw_y * 1.1)), (int(w * 0.45), bw_y), (int(w * 0.42), int(bw_y * 0.96)), (0, int(bw_y * 1.05))], fill=(110, 120, 130))
-
-    return im
 
 
 def _draw_engineering_info_overlay(clean_img: Image.Image, sc: dict) -> Image.Image:
@@ -267,24 +235,24 @@ def _draw_engineering_info_overlay(clean_img: Image.Image, sc: dict) -> Image.Im
     callouts = []
     vector_arrows = []
     
-    # 쇼츠 세로 안전 영역 (X: 10%~90%, Y: 22%~62%)
-    if any(k in narration for k in ["잠제", "수중", "보이지 않", "물속"]):
-        callouts.append(("마루수심", "-0.5m ~ -1.5m", int(W * 0.22), int(H * 0.42), int(W * 0.45), int(H * 0.50)))
-        vector_arrows.append(((int(W * 0.78), int(H * 0.36)), (int(W * 0.50), int(H * 0.40)), "쇄파 감쇄 70%", (0, 220, 255)))
+    # 쇼츠 세로 안전 영역 (X: 12%~88%, Y: 25%~60% - 좌우 및 상하 여백 확보)
+    if any(k in narration for k in ["잠제", "수중방파제", "수중", "물속"]):
+        callouts.append(("수중방파제 마루수심", "-0.5m ~ -1.5m", int(W * 0.16), int(H * 0.38), int(W * 0.48), int(H * 0.50)))
+        vector_arrows.append(((int(W * 0.82), int(H * 0.35)), (int(W * 0.52), int(H * 0.42)), "쇄파 감쇄 70%", (0, 220, 255)))
     elif any(k in narration for k in ["양빈", "모래", "백사장", "침식"]):
-        callouts.append(("양빈 체적", "100,000㎥", int(W * 0.22), int(H * 0.45), int(W * 0.40), int(H * 0.52)))
-        vector_arrows.append(((int(W * 0.25), int(H * 0.58)), (int(W * 0.65), int(H * 0.58)), "표사 이동 벡터", (255, 210, 50)))
+        callouts.append(("양빈 체적", "100,000㎥", int(W * 0.16), int(H * 0.42), int(W * 0.46), int(H * 0.52)))
+        vector_arrows.append(((int(W * 0.22), int(H * 0.58)), (int(W * 0.68), int(H * 0.58)), "표사 이동 벡터", (255, 210, 50)))
     elif any(k in narration for k in ["케이슨", "자중", "혼성제"]):
-        callouts.append(("설계 자중", "15,000 t", int(W * 0.22), int(H * 0.38), int(W * 0.42), int(H * 0.45)))
-        vector_arrows.append(((int(W * 0.80), int(H * 0.40)), (int(W * 0.55), int(H * 0.43)), "Goda 쇄파압", (255, 90, 60)))
+        callouts.append(("설계 자중", "15,000 t", int(W * 0.16), int(H * 0.36), int(W * 0.48), int(H * 0.46)))
+        vector_arrows.append(((int(W * 0.82), int(H * 0.38)), (int(W * 0.54), int(H * 0.44)), "Goda 쇄파압", (255, 90, 60)))
     elif any(k in narration for k in ["테트라포드", "소파블록", "4개"]):
-        callouts.append(("소파블록", "50t TTP", int(W * 0.22), int(H * 0.40), int(W * 0.40), int(H * 0.48)))
-        vector_arrows.append(((int(W * 0.75), int(H * 0.36)), (int(W * 0.52), int(H * 0.42)), "공극률 50% 분산", (0, 230, 190)))
+        callouts.append(("소파블록 규격", "50t TTP", int(W * 0.16), int(H * 0.38), int(W * 0.46), int(H * 0.48)))
+        vector_arrows.append(((int(W * 0.78), int(H * 0.35)), (int(W * 0.52), int(H * 0.42)), "공극률 50% 파력분산", (0, 230, 190)))
     elif any(k in narration for k in ["준설", "수심"]):
-        callouts.append(("계획수심", "-16.0 m", int(W * 0.22), int(H * 0.42), int(W * 0.45), int(H * 0.52)))
+        callouts.append(("항로 계획수심", "-16.0 m", int(W * 0.16), int(H * 0.40), int(W * 0.48), int(H * 0.52)))
     else:
-        callouts.append(("수리역학 해석", "KDS 64 10", int(W * 0.22), int(H * 0.40), int(W * 0.45), int(H * 0.48)))
-        vector_arrows.append(((int(W * 0.78), int(H * 0.38)), (int(W * 0.52), int(H * 0.42)), "파랑 투과 감쇄", (0, 220, 255)))
+        # 일반 풍경이나 인트로 등에서는 강제 허위 라벨을 그리지 않고 클린 상태 유지
+        return clean_img
 
     # 2. 물리/유체 벡터 화살표 렌더링 (신비한 건축사전: 슬림한 2px 선 + 세련된 미니멀 화살촉)
     for start_pt, end_pt, vec_label, color_rgb in vector_arrows:
@@ -431,15 +399,12 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
         if not success:
             prev_imgs = [p for p in clean_dir.glob("*.png") if p.name != "thumb.png" and p.exists()]
             if prev_imgs:
-                log.warning(f"CLEAN 이미지 {sid}: 직전 장면({prev_imgs[-1].name}) 재사용")
+                log.warning(f"CLEAN 이미지 {sid}: 직전 고화질 3D 장면({prev_imgs[-1].name}) 재사용")
                 clean_pil = Image.open(prev_imgs[-1]).convert("RGB")
                 success = True
 
-        # 4차: 최종 비상 시각화 그래픽 (맑은 에메랄드 해안 풍경)
         if not success:
-            log.warning(f"CLEAN 이미지 {sid}: 고화질 에메랄드 해안 아트워크 생성")
-            clean_pil = _draw_emergency_coastal_visual(prompt, sid, W, H)
-            success = True
+            raise RuntimeError(f"장면 {sid} 이미지 생성 실패: AI(Google Imagen / Gemini / DALL-E) 호출이 실패하였습니다. 유치한 2D 그림은 생성하지 않고 중단합니다.")
 
         # CLEAN 이미지 저장
         clean_pil.save(out_clean, "PNG")

@@ -320,10 +320,17 @@ def generate_script(topic: str, out_dir: Path) -> dict:
             "> 1차 CLEAN 베이스 위에 반투명 3D 수치, 파력 벡터, 절단면 치수선을 증강하는 프롬프트입니다.\n"
         ]
 
-        for sc in script["scenes"]:
+        video_prompt_lines = [
+            f"# VIDEO GENERATION PROMPTS (CLEAN-to-INFO 4초 영상 클립 프롬프트)\n",
+            f"> 채널: OCEAN CODE LAB | 포맷: {current_fmt} ({'9:16 Vertical' if current_fmt == 'shorts' else '16:9 Landscape'})\n",
+            "> MD 규격: 각 클립은 CLEAN 시작 프레임에서 시작하여 자연스러운 유체/파랑/카메라 무빙 후 INFO 상태로 점진 수렴합니다.\n"
+        ]
+
+        for idx, sc in enumerate(script["scenes"]):
             sid = sc.get("id", 1)
             sc_id_str = f"S{sid:02d}A"
             kf_id_str = f"KF-{sid:02d}A"
+            clip_name = f"CLIP{idx+1:02d}_{sc_id_str}_{kf_id_str}.mp4"
             narration = sc.get("narration", "").replace("\n", " ")
             vtype = sc.get("visual_type", "aerial_drone")
             base_p = sc.get("clean_prompt") or sc.get("image_prompt", "")
@@ -343,13 +350,22 @@ def generate_script(topic: str, out_dir: Path) -> dict:
             info_prompt_lines.append(f"- **나레이션**: {narration}")
             info_prompt_lines.append(f"```text\n{info_p}\n```\n")
 
+            video_prompt_lines.append(f"## [{clip_name}] ({sc_id_str})")
+            video_prompt_lines.append(f"- **Source CLEAN**: clean/{sid}.png (KF-{sid:02d}A)")
+            video_prompt_lines.append(f"- **Target INFO**: info/{sid}.png (KF-{sid:02d}A)")
+            video_prompt_lines.append(f"- **나레이션**: {narration}")
+            video_prompt_lines.append(f"- **카메라 기동**: 5~15도 미세 오빗/트래킹 무빙")
+            video_prompt_lines.append(f"- **시뮬레이션 모션**: 유체역학적 파랑 흐름, 쇄파 에너지 소산, 3D 구조물 앵커 지시선 생성")
+            video_prompt_lines.append(f"```text\nCinematic 4K maritime engineering simulation, subtle 10-degree tracking motion, authentic fluid dynamics with waves breaking and energy dissipating, clean geometry to 3D engineering callout transition, {base_p}\n```\n")
+
         (manifests_dir / "IMAGE_SEQUENCE.md").write_text("\n".join(seq_lines), encoding="utf-8")
         (prompts_dir / "CLEAN_KEYFRAME_PROMPTS.md").write_text("\n".join(clean_prompt_lines), encoding="utf-8")
         (prompts_dir / "INFOGRAPHIC_KEYFRAME_PROMPTS.md").write_text("\n".join(info_prompt_lines), encoding="utf-8")
+        (prompts_dir / "VIDEO_GENERATION_PROMPTS.md").write_text("\n".join(video_prompt_lines), encoding="utf-8")
         
         # 다시 저장하여 clean_prompt, info_prompt 반영
         save_json(out_dir / "script.json", script)
-        log.info(f"✨ [Codex 연동] 매니페스트 및 프롬프트 파일 저장 완료 ({manifests_dir}, {prompts_dir})")
+        log.info(f"✨ [Codex 연동] 매니페스트 및 3개 프롬프트 파일 저장 완료 ({manifests_dir}, {prompts_dir})")
     except Exception as ce:
         log.warning(f"Codex 매니페스트 생성 예외: {ce}")
 

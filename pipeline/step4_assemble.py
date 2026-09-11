@@ -69,19 +69,31 @@ def build_scene(i: int, sc: dict, out_dir: Path, tmp: Path, motion_clips: dict, 
     
     silent = tmp / f"{sid}_v.mp4"
     
-    # Google Flow 클립 또는 Veo 모션 클립 우선 적용
+    # Google Flow 클립 또는 Veo 모션 클립 우선 적용 (MD Stage 7 규격: 01_CLIP_... 또는 videos/{sid}.mp4)
     clip_src = None
-    source_clips_dir = out_dir / "source_clips"
-    if source_clips_dir.exists():
-        cand = source_clips_dir / f"{sid}.mp4"
-        if cand.exists():
-            clip_src = cand
+    search_dirs = [out_dir / "videos", out_dir / "source_clips", out_dir / "video"]
+    for sdir in search_dirs:
+        if sdir.exists():
+            # 1. sid 직접 일치 (예: 1.mp4, S01A.mp4)
+            for ext in [".mp4", ".mov", ".webm"]:
+                cand = sdir / f"{sid}{ext}"
+                if cand.exists():
+                    clip_src = cand; break
+                # 2. CLIP 번호 일치 (예: CLIP01_... 또는 01_CLIP_...)
+                for f in sdir.glob(f"*{ext}"):
+                    if f"CLIP{i+1:02d}" in f.name or f"CLIP_{i+1:02d}" in f.name or f"{i+1:02d}_" in f.name or f"S{sid:02d}" in f.name:
+                        clip_src = f; break
+                if clip_src:
+                    break
+        if clip_src:
+            break
+
     if not clip_src and sid in motion_clips and Path(motion_clips[sid]).exists():
         clip_src = Path(motion_clips[sid])
 
     if clip_src:
         _fit_video(clip_src, silent, W, H, fps, dur)
-        log.info(f"장면 {sid}: Google Flow 비디오 클립 적용 ({dur:.1f}s 싱크)")
+        log.info(f"장면 {sid}: Google Flow / Veo 비디오 클립 적용 ({clip_src.name}, {dur:.1f}s 싱크)")
     else:
         render_parallax(src_clean_path, dur, silent, fps=fps, mode=i % 6, strength=strength, info_img_path=src_info_path)
         log.info(f"장면 {sid}: 3D CLEAN-to-INFO 공학 모션 렌더 {dur:.1f}s (모드 {i % 6})")

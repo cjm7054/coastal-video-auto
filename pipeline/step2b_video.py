@@ -21,18 +21,22 @@ def generate_motion_clips(script: dict, out_dir: Path) -> dict:
         remaining = [s for s in script["scenes"] if s not in targets]
         targets += remaining[: vcfg["max_scenes"] - len(targets)]
     targets = targets[: vcfg["max_scenes"]]
-    result = {}
+    ar = "9:16" if cfg.get("current_format") == "shorts" else "16:9"
     for sc in targets:
         out = out_dir / "videos" / f"{sc['id']}.mp4"
         if out.exists():
             result[sc["id"]] = out; continue
-        img_path = out_dir / "images" / f"{sc['id']}.png"
+        clean_img_path = out_dir / "clean" / f"{sc['id']}.png"
+        img_path = clean_img_path if clean_img_path.exists() else out_dir / "images" / f"{sc['id']}.png"
         if not img_path.exists():
             continue
         img = types.Image.from_file(location=str(img_path))
-        prompt = f"{sc.get('motion_prompt') or sc['image_prompt']}. {vcfg['style_suffix'].strip()}"
+        
+        # MD Stage 6 규격: CLEAN 시작 프레임에서 자연스러운 카메라 무빙 및 유체 역학 시뮬레이션
+        m_prompt = sc.get('motion_prompt') or sc.get('clean_prompt') or sc.get('image_prompt', '')
+        prompt = f"Cinematic photorealistic 3D engineering documentary shot, subtle 5-15 degree camera movement, fluid dynamics and wave motion, {m_prompt}. {vcfg.get('style_suffix', '').strip()}"
         try:
-            log.info(f"Veo 모델({vcfg['model']}) 영상 생성 호출 시도: {prompt[:80]}...")
+            log.info(f"Veo 영상 생성 호출 시도 ({sc['id']}, {ar}, {vcfg['model']}): {prompt[:80]}...")
             # 1. source 객체 전달 방식 시도
             try:
                 op = client.models.generate_videos(
@@ -43,7 +47,7 @@ def generate_motion_clips(script: dict, out_dir: Path) -> dict:
                     ),
                     config=types.GenerateVideosConfig(
                         number_of_videos=1,
-                        aspect_ratio="16:9",
+                        aspect_ratio=ar,
                         duration_seconds=vcfg.get("seconds", 5),
                         enhance_prompt=True,
                     ),
@@ -55,7 +59,7 @@ def generate_motion_clips(script: dict, out_dir: Path) -> dict:
                     prompt=prompt,
                     image=img,
                     config=types.GenerateVideosConfig(
-                        aspect_ratio="16:9",
+                        aspect_ratio=ar,
                         duration_seconds=vcfg.get("seconds", 5),
                     ),
                 )
