@@ -16,12 +16,42 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
     clean_prompt = prompt[:900]
     client = genai.Client(api_key=api_key)
 
-    # 1. Gemini 멀티모달 generate_content (IMAGE 모달리티) - Google AI Studio 키에서 100% 정상 작동 검증
-    multimodal_models = ["gemini-3.1-flash-image", "gemini-2.5-flash-image"]
+    # 1. Imagen 3.0 / 4.0 models.generate_images (Google 공식 Text-to-Image 표준 엔드포인트)
+    imagen_models = [
+        "imagen-3.0-generate-002",
+        "imagen-4.0-generate-001",
+    ]
+    ar = cfg["images"].get("aspect_ratio", "16:9")
+    for m in imagen_models:
+        try:
+            log.info(f"Google Imagen({m}, {ar}) 시도...")
+            resp = client.models.generate_images(
+                model=m,
+                prompt=clean_prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    aspect_ratio=ar,
+                    output_mime_type="image/jpeg",
+                ),
+            )
+            if resp and resp.generated_images:
+                img_wrapper = resp.generated_images[0]
+                img_obj = getattr(img_wrapper, "image", img_wrapper)
+                raw = getattr(img_obj, "image_bytes", None) or getattr(img_obj, "_image_bytes", None)
+                if raw:
+                    return base64.b64decode(raw) if isinstance(raw, str) else raw
+                if hasattr(img_obj, "save"):
+                    buf = io.BytesIO()
+                    img_obj.save(buf, format="JPEG")
+                    return buf.getvalue()
+        except Exception as err:
+            log.warning(f"Google Imagen({m}) 시도 실패: {err}")
+
+    # 2. Gemini 멀티모달 generate_content (IMAGE 모달리티 백업)
+    multimodal_models = ["gemini-2.5-flash-image", "gemini-3.1-flash-image"]
     for fm in multimodal_models:
         try:
             log.info(f"Gemini({fm}) 이미지 생성 호출: {clean_prompt[:60]}...")
-            ar = cfg["images"].get("aspect_ratio", "16:9")
             resp = client.models.generate_content(
                 model=fm,
                 contents=clean_prompt,
@@ -44,23 +74,6 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
                     return base64.b64decode(d) if isinstance(d, str) else d
         except Exception as ferr:
             log.warning(f"Gemini generate_content({fm}) 실패: {ferr}")
-
-    # 2. Imagen 3.0 / 4.0 models.generate_images (Vertex 연계 또는 Developer 모드)
-    imagen_models = [
-        "imagen-3.0-generate-002",
-        "imagen-4.0-generate-001",
-    ]
-    for m in imagen_models:
-        try:
-            log.info(f"Google Imagen({m}) 시도...")
-            resp = client.models.generate_images(
-                model=m,
-                prompt=clean_prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    output_mime_type="image/jpeg",
-                ),
-            )
             if resp and resp.generated_images:
                 img_wrapper = resp.generated_images[0]
                 img_obj = getattr(img_wrapper, "image", img_wrapper)

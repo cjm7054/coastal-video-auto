@@ -44,7 +44,7 @@ script:
     지적이고 묵직하며 몰입감 넘치는 명품 다큐멘터리를 전개한다.
 
 images:
-  provider: "openai"                 # gemini (Google Imagen 3/4) | openai (DALL-E 3)
+  provider: "gemini"                 # gemini (Google Imagen 3/4) | openai (DALL-E 3)
   gemini_model: "imagen-3.0-generate-002"
   openai_model: "dall-e-3"
   # 신비한 건축사전(@archcutaway) 스타일: 세련된 모던 3D 건축 모형 및 맑은 바다 뷰 (Clean Minimalism)
