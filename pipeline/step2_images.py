@@ -436,14 +436,10 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
         success = False
         clean_pil = None
 
-        # 0차: 이미 고화질 3D 실사 이미지가 사전에 준비되어 있는 경우 즉시 활용
+        # 0차: 이미 현재 작업 폴더에 고화질 3D 실사 이미지가 생성되어 있는 경우 즉시 활용
         if out_clean.exists() and out_clean.stat().st_size > 10000:
-            log.info(f"CLEAN 이미지 {sid}: 사전에 준비된 고화질 3D 실사 에셋 활용")
+            log.info(f"CLEAN 이미지 {sid}: 이미 생성된 고화질 에셋 활용")
             clean_pil = Image.open(out_clean).convert("RGB")
-            success = True
-        elif out_main.exists() and out_main.stat().st_size > 10000:
-            log.info(f"CLEAN 이미지 {sid}: 기존 images 에셋 활용")
-            clean_pil = Image.open(out_main).convert("RGB")
             success = True
 
 
@@ -475,27 +471,20 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 except Exception as ge2:
                     log.warning(f"CLEAN 이미지 {sid} {gen_name} 재시도 실패: {ge2}")
 
-        # 3차: 로컬 템플릿 풀 매핑 (각 장면 sid에 정확히 매칭되는 고유 템플릿 우선 할당)
+        # 3차: 로컬 템플릿 풀 매핑 (해당 주제와 100% 일치하는 전용 템플릿만 허용 - 이종 주제 혼입 엄격 차단)
         if not success:
             template_dir = ROOT / "assets" / "templates" / "coastal_engineering"
-            topic_keywords = [w for w in ["새만금", "케이슨", "방파제", "잠제", "양빈", "사석"] if w in topic]
-            if topic_keywords and template_dir.exists():
+            # 새만금 템플릿은 오직 '새만금' 주제일 때만 허용 (다른 방파제/케이슨 주제에 새만금 수문 사진 유출 차단)
+            if "새만금" in topic and template_dir.exists():
                 cand_tpl = template_dir / f"{sid}.png"
                 if cand_tpl.exists():
-                    log.info(f"CLEAN 이미지 {sid}: 장면 고유 마스터 템플릿({cand_tpl.name}) 로드")
+                    log.info(f"CLEAN 이미지 {sid}: 새만금 전용 마스터 템플릿({cand_tpl.name}) 로드")
                     clean_pil = Image.open(cand_tpl).convert("RGB")
                     success = True
 
-        # 4차: 이전 유효 장면 재사용 (해당 장면에 매칭되는 템플릿조차 없을 때 최후의 수단으로만 사용)
         if not success:
-            prev_imgs = [p for p in clean_dir.glob("*.png") if p.name != "thumb.png" and p.exists()]
-            if prev_imgs:
-                log.warning(f"CLEAN 이미지 {sid}: 직전 고화질 3D 장면({prev_imgs[-1].name}) 재사용")
-                clean_pil = Image.open(prev_imgs[-1]).convert("RGB")
-                success = True
+            raise RuntimeError(f"장면 {sid} 이미지 생성 실패: AI(Google Imagen / Gemini / DALL-E) 호출이 실패하였으며 해당 주제에 맞는 검증된 에셋이 없습니다. 서로 다른 장면에 같은 이미지를 중복 복제하는 왜곡을 방지하기 위해 중단합니다.")
 
-        if not success:
-            raise RuntimeError(f"장면 {sid} 이미지 생성 실패: AI(Google Imagen / Gemini / DALL-E) 호출이 실패하였으며 해당 주제에 맞는 검증된 에셋이 없습니다. 주제 왜곡을 방지하기 위해 임의의 무관한 템플릿을 끼워넣지 않고 중단합니다.")
 
         # 이미지 크기를 설정된 W, H로 정확하게 리사이즈/크롭 보증 (렌더러/블렌드 필터 규격 일치)
         if clean_pil.size != (W, H):
