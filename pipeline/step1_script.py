@@ -25,6 +25,18 @@ PROMPT = """당신은 대한민국 해안·항만 토목공학의 본질을 밝�
       "image_prompt": "이 장면의 영문 8K 시네마틱 프롬프트 (클린 베이스 이미지: 맑은 에메랄드 바다, 해변, 드론 뷰, 현대적 수중 구조물 등 visual_type에 맞게 작성, 텍스트/화살표 배제).",
       "clean_prompt": "1차 통과 순수 실사 렌더 프롬프트 (No text, no labels, no arrows, pure 8K photoreal maritime visual)",
       "info_prompt": "2차 통과 3D 인포그래픽 오버레이 프롬프트 (Semi-transparent 3D force arrows, callout measurement lines, structural cutaway annotation)",
+      "info_callouts": [
+        {{
+          "label": "공학 측정 항목명 (예: 조류 유속 / 사석 단중 / 조위차 등 대본과 100% 일치)",
+          "value": "실제 검증 수치와 단위 (예: 7.0 m/s / 30 t / 4.7 m)"
+        }}
+      ],
+      "vectors": [
+        {{
+          "label": "유체/하중 벡터 설명 (예: 쇄파 에너지 감쇄 / 사석 세굴 유체력)",
+          "direction": "left_to_right 또는 right_to_left 또는 top_down"
+        }}
+      ],
       "motion": true,
       "motion_prompt": "카메라 궤적 및 물리적 시뮬레이션 영문 프롬프트"
     }}
@@ -351,12 +363,19 @@ def generate_script(topic: str, out_dir: Path) -> dict:
             info_prompt_lines.append(f"```text\n{info_p}\n```\n")
 
             video_prompt_lines.append(f"## [{clip_name}] ({sc_id_str})")
-            video_prompt_lines.append(f"- **Source CLEAN**: clean/{sid}.png (KF-{sid:02d}A)")
-            video_prompt_lines.append(f"- **Target INFO**: info/{sid}.png (KF-{sid:02d}A)")
-            video_prompt_lines.append(f"- **나레이션**: {narration}")
-            video_prompt_lines.append(f"- **카메라 기동**: 5~15도 미세 오빗/트래킹 무빙")
-            video_prompt_lines.append(f"- **시뮬레이션 모션**: 유체역학적 파랑 흐름, 쇄파 에너지 소산, 3D 구조물 앵커 지시선 생성")
-            video_prompt_lines.append(f"```text\nCinematic 4K maritime engineering simulation, subtle 10-degree tracking motion, authentic fluid dynamics with waves breaking and energy dissipating, clean geometry to 3D engineering callout transition, {base_p}\n```\n")
+            video_prompt_lines.append(f"- **CLEAN source ID**: clean/{sid}.png ({kf_id_str}) [Start Frame]")
+            video_prompt_lines.append(f"- **INFO target ID**: info/{sid}.png ({kf_id_str}) [End Frame Reference]")
+            video_prompt_lines.append(f"- **Duration**: 4.0 seconds (Vertical 9:16)")
+            video_prompt_lines.append(f"- **Narration context**: {narration}")
+            video_prompt_lines.append(f"- **Camera Movement**: Subtle 8-12 degree tracking/dolly motion, maintaining horizon and perspective depth")
+            video_prompt_lines.append(f"- **Graphic Build Sequence**:")
+            video_prompt_lines.append(f"  * 0.0-0.4s: Pure CLEAN maritime visual. Subtle environmental fluid motion starts.")
+            video_prompt_lines.append(f"  * 0.4-0.9s: Engineering anchor points light up on structures/currents.")
+            video_prompt_lines.append(f"  * 0.9-1.7s: 3D callout lines and fluid flow streamlines construct outward.")
+            video_prompt_lines.append(f"  * 1.7-2.6s: Technical labels and verified engineering measurements assemble.")
+            video_prompt_lines.append(f"  * 2.6-3.4s: Flow/force vectors pulse along the physical load path.")
+            video_prompt_lines.append(f"  * 3.4-4.0s: Composition cleanly converges on the approved INFO target state.")
+            video_prompt_lines.append(f"```text\nGoogle Flow / Image-to-Video Prompt:\nStarting from the clean engineering photograph, execute a continuous 4.0-second single shot with subtle 10-degree tracking camera movement. Authentic fluid dynamics with sea water rushing and waves breaking. Progressively construct semi-transparent 3D technical callout lines, anchor points, and flow vectors in 3D scene space, respecting perspective, parallax, and occlusion, smoothly converging into the final engineering infographic state: {base_p}\n```\n")
 
         (manifests_dir / "IMAGE_SEQUENCE.md").write_text("\n".join(seq_lines), encoding="utf-8")
         (prompts_dir / "CLEAN_KEYFRAME_PROMPTS.md").write_text("\n".join(clean_prompt_lines), encoding="utf-8")

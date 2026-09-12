@@ -268,23 +268,58 @@ def _draw_engineering_info_overlay(clean_img: Image.Image, sc: dict) -> Image.Im
     # 1. 기술 데이터베이스 및 치수 도출 (MD 규격: 씬당 1~2개의 미세 지시선만 허용)
     callouts = []
     vector_arrows = []
-    
-    # 쇼츠 세로 안전 영역 (X: 12%~88%, Y: 25%~60% - 좌우 및 상하 여백 확보)
-    if any(k in narration for k in ["잠제", "수중방파제", "수중", "물속"]):
-        callouts.append(("수중방파제 마루수심", "-0.5m ~ -1.5m", int(W * 0.16), int(H * 0.38), int(W * 0.48), int(H * 0.50)))
-        vector_arrows.append(((int(W * 0.82), int(H * 0.35)), (int(W * 0.52), int(H * 0.42)), "쇄파 감쇄 70%", (0, 220, 255)))
-    elif any(k in narration for k in ["양빈", "모래", "백사장", "침식"]):
-        callouts.append(("양빈 체적", "100,000㎥", int(W * 0.16), int(H * 0.42), int(W * 0.46), int(H * 0.52)))
-        vector_arrows.append(((int(W * 0.22), int(H * 0.58)), (int(W * 0.68), int(H * 0.58)), "표사 이동 벡터", (255, 210, 50)))
-    elif any(k in narration for k in ["케이슨", "자중", "혼성제"]):
-        callouts.append(("설계 자중", "15,000 t", int(W * 0.16), int(H * 0.36), int(W * 0.48), int(H * 0.46)))
-        vector_arrows.append(((int(W * 0.82), int(H * 0.38)), (int(W * 0.54), int(H * 0.44)), "Goda 쇄파압", (255, 90, 60)))
-    elif any(k in narration for k in ["테트라포드", "소파블록", "4개"]):
-        callouts.append(("소파블록 규격", "50t TTP", int(W * 0.16), int(H * 0.38), int(W * 0.46), int(H * 0.48)))
-        vector_arrows.append(((int(W * 0.78), int(H * 0.35)), (int(W * 0.52), int(H * 0.42)), "공극률 50% 파력분산", (0, 230, 190)))
-    elif any(k in narration for k in ["준설", "수심"]):
-        callouts.append(("항로 계획수심", "-16.0 m", int(W * 0.16), int(H * 0.40), int(W * 0.48), int(H * 0.52)))
-    else:
+
+    # A. 스크립트 JSON에 info_callouts가 정의되어 있는 경우 최우선 동적 추출 (100% 팩트 고증 일치)
+    script_callouts = sc.get("info_callouts") or []
+    if script_callouts:
+        for idx_c, sc_c in enumerate(script_callouts[:2]):
+            lbl = sc_c.get("label", "").strip()
+            val = sc_c.get("value", "").strip()
+            if lbl and val:
+                bx = int(W * 0.16)
+                by = int(H * (0.36 + idx_c * 0.08))
+                ax = int(W * 0.48)
+                ay = int(H * (0.46 + idx_c * 0.06))
+                callouts.append((lbl, val, bx, by, ax, ay))
+
+    # B. 스크립트 JSON에 vectors가 정의되어 있는 경우 동적 추출
+    script_vectors = sc.get("vectors") or []
+    if script_vectors:
+        for idx_v, sc_v in enumerate(script_vectors[:1]):
+            v_lbl = sc_v.get("label", "").strip()
+            v_dir = sc_v.get("direction", "right_to_left")
+            if v_lbl:
+                if v_dir == "left_to_right":
+                    vector_arrows.append(((int(W * 0.22), int(H * 0.52)), (int(W * 0.72), int(H * 0.52)), v_lbl, (0, 220, 255)))
+                elif v_dir == "top_down":
+                    vector_arrows.append(((int(W * 0.50), int(H * 0.25)), (int(W * 0.50), int(H * 0.60)), v_lbl, (255, 180, 50)))
+                else:
+                    vector_arrows.append(((int(W * 0.82), int(H * 0.38)), (int(W * 0.52), int(H * 0.44)), v_lbl, (0, 220, 255)))
+
+    # C. JSON에 callout이 없고 나레이션에 명확한 공학 수치가 포함되어 있는 경우에만 문맥 기반 추출
+    if not callouts:
+        m_vel = re.search(r"초속\s*(\d+(?:\.\d+)?)\s*미터", narration)
+        m_ton = re.search(r"(\d+(?:,\d+)?)\s*톤", narration)
+        m_meter = re.search(r"(\d+(?:\.\d+)?)\s*미터", narration)
+        
+        if m_vel:
+            callouts.append(("조류 유속", f"{m_vel.group(1)} m/s", int(W * 0.16), int(H * 0.38), int(W * 0.48), int(H * 0.48)))
+            vector_arrows.append(((int(W * 0.82), int(H * 0.38)), (int(W * 0.52), int(H * 0.44)), "조류 유체력", (0, 220, 255)))
+        elif m_ton:
+            callouts.append(("사석/블록 단위중량", f"{m_ton.group(1)} t", int(W * 0.16), int(H * 0.38), int(W * 0.48), int(H * 0.48)))
+        elif m_meter and any(k in narration for k in ["조위차", "수위", "차이"]):
+            callouts.append(("최대 조위차", f"{m_meter.group(1)} m", int(W * 0.16), int(H * 0.38), int(W * 0.48), int(H * 0.48)))
+        elif any(k in narration for k in ["잠제", "수중방파제"]):
+            callouts.append(("수중방파제 마루수심", "-0.5m ~ -1.5m", int(W * 0.16), int(H * 0.38), int(W * 0.48), int(H * 0.50)))
+            vector_arrows.append(((int(W * 0.82), int(H * 0.35)), (int(W * 0.52), int(H * 0.42)), "쇄파 감쇄 70%", (0, 220, 255)))
+        elif any(k in narration for k in ["양빈", "모래", "백사장", "침식"]):
+            callouts.append(("양빈 체적", "100,000㎥", int(W * 0.16), int(H * 0.42), int(W * 0.46), int(H * 0.52)))
+            vector_arrows.append(((int(W * 0.22), int(H * 0.58)), (int(W * 0.68), int(H * 0.58)), "표사 이동 벡터", (255, 210, 50)))
+        elif any(k in narration for k in ["소파블록", "테트라포드"]):
+            callouts.append(("소파블록 규격", "50t TTP", int(W * 0.16), int(H * 0.38), int(W * 0.46), int(H * 0.48)))
+            vector_arrows.append(((int(W * 0.78), int(H * 0.35)), (int(W * 0.52), int(H * 0.42)), "공극률 50% 파력분산", (0, 230, 190)))
+
+    if not callouts and not vector_arrows:
         # 일반 풍경이나 인트로 등에서는 강제 허위 라벨을 그리지 않고 클린 상태 유지
         return clean_img
 
@@ -448,24 +483,20 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 clean_pil = Image.open(prev_imgs[-1]).convert("RGB")
                 success = True
 
-        # 4차: 고화질 Octane 3D 해양 토목 마스터 템플릿 에셋 매핑 (API 할당량 초과 비상 대응)
+        # 4차: 로컬 템플릿 풀 매핑 (단, 현재 주제와 연관된 템플릿만 허용 - 이종 주제 혼입 엄격 차단)
         if not success:
             template_dir = ROOT / "assets" / "templates" / "coastal_engineering"
-            cand_tpl = template_dir / f"{sid}.png"
-            if cand_tpl.exists():
-                log.info(f"CLEAN 이미지 {sid}: 4K 3D 해양토목 마스터 템플릿({cand_tpl.name}) 로드")
-                clean_pil = Image.open(cand_tpl).convert("RGB")
-                success = True
-            else:
-                all_tpls = sorted(template_dir.glob("*.png"))
-                if all_tpls:
-                    fallback_tpl = all_tpls[0] if sid == "thumb" else all_tpls[(int(sid) - 1) % len(all_tpls)]
-                    log.info(f"CLEAN 이미지 {sid}: 4K 3D 해양토목 마스터 템플릿 풀({fallback_tpl.name}) 로드")
-                    clean_pil = Image.open(fallback_tpl).convert("RGB")
+            topic_keywords = [w for w in ["새만금", "케이슨", "방파제", "잠제", "양빈", "사석"] if w in topic]
+            # 주제 키워드가 일치하지 않으면 무관한 템플릿을 무단 주입하지 않음
+            if topic_keywords and template_dir.exists():
+                cand_tpl = template_dir / f"{sid}.png"
+                if cand_tpl.exists():
+                    log.info(f"CLEAN 이미지 {sid}: 주제 일치 마스터 템플릿({cand_tpl.name}) 로드")
+                    clean_pil = Image.open(cand_tpl).convert("RGB")
                     success = True
 
         if not success:
-            raise RuntimeError(f"장면 {sid} 이미지 생성 실패: AI(Google Imagen / Gemini / DALL-E) 호출이 실패하였으며 로컬 템플릿이 없습니다. 유치한 2D 그림은 생성하지 않고 중단합니다.")
+            raise RuntimeError(f"장면 {sid} 이미지 생성 실패: AI(Google Imagen / Gemini / DALL-E) 호출이 실패하였으며 해당 주제에 맞는 검증된 에셋이 없습니다. 주제 왜곡을 방지하기 위해 임의의 무관한 템플릿을 끼워넣지 않고 중단합니다.")
 
         # 이미지 크기를 설정된 W, H로 정확하게 리사이즈/크롭 보증 (렌더러/블렌드 필터 규격 일치)
         if clean_pil.size != (W, H):
