@@ -343,7 +343,10 @@ def generate_audio(script: dict, out_dir: Path) -> dict:
                 log.info(f"타입캐스트 모건 보이스 합성 중: 장면 {sc['id']} (발음 정제: {spoken_text[:40]}...)...")
                 words = _typecast_one(spoken_text, mp3, cfg)
             except Exception as te:
-                log.warning(f"타입캐스트 합성 실패 ({te}) → Edge-TTS 자동 대체")
+                strict = cfg["tts"].get("strict_voice", False)
+                if strict:
+                    raise RuntimeError(f"타입캐스트 '모건' 합성 실패 (strict_voice 모드): {te}")
+                log.warning(f"⚠️ [주의] 타입캐스트 합성 실패 ({te}) → 임시 Edge-TTS로 자동 대체되었습니다. 모건 목소리로 출력하려면 Typecast API 키와 크레딧 상태를 확인하세요.")
                 words = asyncio.run(_edge_one(spoken_text, mp3, cfg["tts"]["edge_voice"], cfg["tts"]["rate"]))
         elif prov == "elevenlabs":
             words = _elevenlabs_one(spoken_text, mp3, cfg)

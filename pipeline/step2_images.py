@@ -475,25 +475,24 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                 except Exception as ge2:
                     log.warning(f"CLEAN 이미지 {sid} {gen_name} 재시도 실패: {ge2}")
 
-        # 3차: 이전 유효 장면 재사용 (무관한 해외 사진 크롤러는 완전 배제)
+        # 3차: 로컬 템플릿 풀 매핑 (각 장면 sid에 정확히 매칭되는 고유 템플릿 우선 할당)
+        if not success:
+            template_dir = ROOT / "assets" / "templates" / "coastal_engineering"
+            topic_keywords = [w for w in ["새만금", "케이슨", "방파제", "잠제", "양빈", "사석"] if w in topic]
+            if topic_keywords and template_dir.exists():
+                cand_tpl = template_dir / f"{sid}.png"
+                if cand_tpl.exists():
+                    log.info(f"CLEAN 이미지 {sid}: 장면 고유 마스터 템플릿({cand_tpl.name}) 로드")
+                    clean_pil = Image.open(cand_tpl).convert("RGB")
+                    success = True
+
+        # 4차: 이전 유효 장면 재사용 (해당 장면에 매칭되는 템플릿조차 없을 때 최후의 수단으로만 사용)
         if not success:
             prev_imgs = [p for p in clean_dir.glob("*.png") if p.name != "thumb.png" and p.exists()]
             if prev_imgs:
                 log.warning(f"CLEAN 이미지 {sid}: 직전 고화질 3D 장면({prev_imgs[-1].name}) 재사용")
                 clean_pil = Image.open(prev_imgs[-1]).convert("RGB")
                 success = True
-
-        # 4차: 로컬 템플릿 풀 매핑 (단, 현재 주제와 연관된 템플릿만 허용 - 이종 주제 혼입 엄격 차단)
-        if not success:
-            template_dir = ROOT / "assets" / "templates" / "coastal_engineering"
-            topic_keywords = [w for w in ["새만금", "케이슨", "방파제", "잠제", "양빈", "사석"] if w in topic]
-            # 주제 키워드가 일치하지 않으면 무관한 템플릿을 무단 주입하지 않음
-            if topic_keywords and template_dir.exists():
-                cand_tpl = template_dir / f"{sid}.png"
-                if cand_tpl.exists():
-                    log.info(f"CLEAN 이미지 {sid}: 주제 일치 마스터 템플릿({cand_tpl.name}) 로드")
-                    clean_pil = Image.open(cand_tpl).convert("RGB")
-                    success = True
 
         if not success:
             raise RuntimeError(f"장면 {sid} 이미지 생성 실패: AI(Google Imagen / Gemini / DALL-E) 호출이 실패하였으며 해당 주제에 맞는 검증된 에셋이 없습니다. 주제 왜곡을 방지하기 위해 임의의 무관한 템플릿을 끼워넣지 않고 중단합니다.")
