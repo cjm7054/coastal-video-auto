@@ -170,12 +170,13 @@ def _typecast_one(text: str, mp3: Path, cfg: dict):
     except Exception as e:
         req_err = str(e)
 
-    # 2. Windows 시스템 curl.exe 폴백 (네트워크 환경/SSL 호환성 보장)
+    # 2. curl 폴백 (네트워크 환경/SSL 호환성 보장: OS에 맞춰 curl/curl.exe 자동 선택)
     try:
         temp_json = mp3.with_suffix(".json")
         temp_json.write_bytes(raw_bytes)
+        curl_bin = "curl.exe" if os.name == "nt" else "curl"
         cmd = [
-            "curl.exe", "-s", "-X", "POST", url,
+            curl_bin, "-s", "-X", "POST", url,
             "-H", f"X-API-KEY: {api_key}",
             "-H", "Content-Type: application/json; charset=utf-8",
             "--data-binary", f"@{temp_json}",
