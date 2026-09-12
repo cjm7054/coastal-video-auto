@@ -248,7 +248,7 @@ def generate_script(topic: str, out_dir: Path) -> dict:
 반드시 각 씬 객체에 "clean_prompt"와 "info_prompt"(수치, 치수, 3D 지시선, 파랑/하중 벡터가 명시된 2차 패스 프롬프트)를 포함해야 합니다.
 출력 형식 예시:
 [
-  {{"id": 1, "narration": "...", "image_prompt": "...", "clean_prompt": "...", "info_prompt": "...", "motion": false}},
+  {{"id": 1, "narration": "...", "image_prompt": "...", "clean_prompt": "...", "info_prompt": "...", "info_callouts": [{{"label": "측정항목", "value": "실제수치"}}], "vectors": [{{"label": "벡터설명", "direction": "right_to_left"}}], "motion": false}},
   ...
 ]
 """
