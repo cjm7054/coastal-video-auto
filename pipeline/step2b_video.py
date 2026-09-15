@@ -11,9 +11,17 @@ def generate_motion_clips(script: dict, out_dir: Path) -> dict:
     vcfg = cfg["video_gen"]
     if not vcfg.get("enabled", True):
         return {}
-    from google import genai
-    from google.genai import types
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    try:
+        from google import genai
+        from google.genai import types
+        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if not api_key:
+            log.warning("GEMINI_API_KEY 미설정 → 고화질 3D 패럴랙스 렌더로 자동 대체")
+            return {}
+        client = genai.Client(api_key=api_key)
+    except Exception as ge:
+        log.warning(f"Google GenAI SDK 로드 불가({ge}) → 고화질 3D 패럴랙스 렌더로 자동 대체")
+        return {}
     (out_dir / "videos").mkdir(exist_ok=True)
     # motion이 명시된 장면 우선, 없으면 시각적 설명이 풍부한 전반부/중반부 장면 선택
     targets = [s for s in script["scenes"] if s.get("motion")]
