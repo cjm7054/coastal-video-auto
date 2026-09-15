@@ -47,13 +47,14 @@ images:
   provider: "gemini"                 # gemini (Google Imagen 3/4) | openai (DALL-E 3)
   gemini_model: "imagen-3.0-generate-002"
   openai_model: "dall-e-3"
-  # 신비한 건축사전(@archcutaway) 스타일: 세련된 모던 3D 건축 모형 및 맑은 바다 뷰 (Clean Minimalism)
+  # 코덱스 & 구글 플로우 표준 3D 공학 인포그래픽 스타일 (Clean Minimalism & Bright Modern Aesthetic)
   style_suffix: >
-    Modern minimalist architectural cutaway, sleek clean aesthetic,
-    crystal clear emerald turquoise water, smooth realistic concrete structure,
-    soft cinematic natural studio daylight, elegant ambient occlusion, uncluttered composition,
-    National Geographic documentary quality, Octane 3D render, highly detailed,
-    completely clean visual, no text, no letters, no labels, no watermark, no hud, no arrows, no red lines
+    Modern futuristic civil engineering 3D architectural model, ultra-sleek clean aesthetic,
+    bright daylight studio lighting, sunlit crystal clear transparent emerald turquoise ocean water,
+    smooth pristine white and light gray concrete architectural structure, elegant ambient occlusion,
+    National Geographic educational documentary quality, Octane 3D render, crisp 8K resolution,
+    vivid contrast, completely clean visual, no dark mud, no dirty rocks, no gloomy shadows,
+    absolutely no text, no letters, no labels, no watermark, no hud, no arrows, no red lines
 
 tts:
   provider: "typecast"               # typecast(유료 모건 보이스) | edge(무료) | elevenlabs(유료)
@@ -65,14 +66,14 @@ tts:
   elevenlabs_voice_id: ""
   elevenlabs_model: "eleven_multilingual_v2"
 
-video_gen:                           # AI 동영상 생성 (Veo) - 고비용 발생 방지를 위해 완전 비활성화 (편당 500원 이하 유지)
-  enabled: false
-  model: "veo-3.1-generate-preview"
-  max_scenes: 0
-  seconds: 0
+video_gen:                           # 구글 플로우 / Veo / Gemini Omni Flash 비디오 생성 연동
+  enabled: true
+  model: "gemini-omni-1.1-flash"     # gemini-omni-1.1-flash | veo-3.1-generate-preview
+  max_scenes: 8
+  seconds: 4                         # 플로우 4초 클립 규격
   resolution: "1080p"
   slow_factor: 1.0
-  style_suffix: ""
+  style_suffix: "smooth cinematic 3D camera pan, bright daylight, sparkling clear water, dynamic engineering simulation"
 
 video:
   fps: 24

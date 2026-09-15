@@ -72,22 +72,22 @@ PROMPT = """당신은 대한민국 해안·항만 토목공학의 본질을 밝�
   3단계: 핵심 공학 실증 솔루션과 메커니즘 (정밀 해부 40%)
   4단계: 공학적 통찰과 지속가능한 미래 (클로징 15%)
 
-[★ 현대적 내셔널 지오그래픽 / 유튜브 쇼츠 레퍼런스 시각화 핵심 원칙]:
-- [★ 매우 중요]: 칙칙하고 어두운 지하 흙더미/자갈 단면도나 어항 속 모형 같은 연출을 절대 금지합니다.
-- **햇살이 내리쬐는 투명한 에메랄드빛 바다, 시원한 고공 드론 뷰, 모던하고 웅장한 현대 토목 구조물의 생생한 실사감**을 최우선으로 연출할 것.
-- 모든 장면마다 "visual_type"을 다음 4가지 중 하나로 명시하고 그에 맞게 "image_prompt"를 작성하세요:
-  1. "aerial_drone" [광활한 고공 에어리얼 뷰]:
-     - 맑고 푸른 에메랄드빛 바다와 백사장, 파도가 부서지는 해안선 전체가 한눈에 들어오는 탁 트인 4K 드론 조망.
-  2. "construction_action" [생생한 공사 현장 액션 샷]:
-     - 대형 작업 바지선, 해상 크레인, 정밀한 블록 거치 작업 현장의 역동적이고 세련된 다큐멘터리 구도.
-  3. "underwater_clarity" [투명하고 맑은 3D 수중 투시]:
-     - 칙칙한 단면도가 아닌, 맑고 투명한 청록색 바닷물 속으로 은은한 햇살(God rays)이 비치며 모던한 수중 잠제나 콘크리트 구조물이 선명히 드러나는 고급 3D 비주얼.
-  4. "wave_impact" [파도 쇄파 충돌 샷]:
-     - 웅장한 파도가 구조물 위에서 하얗게 부서지며 에너지가 소멸하는 시원하고 역동적인 슬로우모션 샷.
+[★ 구글 플로우(Google Flow) 및 코덱스(Codex) 표준 3D 공학 시각화 핵심 원칙]:
+- [★ 절대 금지]: 칙칙하고 어두운 지하 흙더미/자갈 단면도, 흙탕물, 오래되고 방치된 이끼 낀 콘크리트, 어두운 암석 묘사를 절대 금지합니다.
+- **햇살이 찬란하게 쏟아지는 투명한 에메랄드빛 청록색 바다, 시원한 고공 4K 드론 뷰, 모던하고 깔끔한 화이트/라이트그레이 3D 건축 모형(신비한 건축사전 및 National Geographic 3D 다큐멘터리 렌더 품질)**을 최우선으로 연출할 것.
+- 모든 장면마다 "visual_type"을 다음 4가지 중 하나로 명시하고 그에 맞게 "image_prompt" 및 "clean_prompt"를 작성하세요:
+  1. "aerial_drone" [광활하고 밝은 고공 4K 에어리얼 뷰]:
+     - 눈부신 햇살 아래 에메랄드빛 바다와 현대적인 대형 해양 구조물이 한눈에 들어오는 투명하고 시원한 3D 조망.
+  2. "construction_action" [모던 해양 공학 3D 시공 뷰]:
+     - 최첨단 대형 해상 크레인 바지선과 매끄러운 모던 콘크리트 블록 거치 현장의 선명하고 역동적인 3D 다큐 구도.
+  3. "underwater_clarity" [투명하고 맑은 3D 수중 컷어웨이/투시]:
+     - 어두운 심해가 아닌, 맑고 투명한 에메랄드빛 바닷물 속으로 은은하고 눈부신 햇살(God rays)이 쏟아지며 순백색의 수중 방파제(잠제)나 복합 케이슨의 내부 격자 셀 구조가 투명하게 드러나는 최고급 3D 건축 투시도.
+  4. "wave_impact" [투명한 파도 쇄파 충돌 샷]:
+     - 하얗고 깨끗하게 부서지는 파도가 현대적 소파블록 및 유공 방파제 위에서 에너지를 상쇄시키는 시원하고 세련된 슬로우모션 샷.
 
-[★ 절대 금지 규칙 - 텍스트/라벨/붉은 화살표 100% 차단]:
-- 이미지 내부에 한글, 영문, 라벨, 수치, 도표, 워터마크, 붉은색 HUD 지시선, 벡터 화살표(pressure vectors) 등을 절대 포함시키지 마세요!
-- 오직 시각적인 물, 모래, 콘크리트, 파도, 구조물의 실제 형태와 조명에만 집중할 것 (Clean visual only, absolutely no text/labels/arrows).
+[★ 절대 금지 규칙 - 1차 베이스 이미지(CLEAN) 내부 텍스트/라벨/붉은선 100% 차단]:
+- 이미지 내부에 한글, 영문, 라벨, 수치, 도표, 워터마크, 붉은색 HUD 지시선, 억지스러운 화살표 등을 절대 포함시키지 마세요!
+- 오직 맑고 투명한 물, 밝은 콘크리트 구조물의 선명한 3D 형태와 채광에만 집중할 것 (Pure 8K 3D photoreal architectural model, absolutely no text/labels/arrows).
 
 [나레이션 딕션 및 발음 절대 규칙]:
 - 공식 채널명: OCEAN CODE LAB
@@ -382,9 +382,31 @@ def generate_script(topic: str, out_dir: Path) -> dict:
         (prompts_dir / "INFOGRAPHIC_KEYFRAME_PROMPTS.md").write_text("\n".join(info_prompt_lines), encoding="utf-8")
         (prompts_dir / "VIDEO_GENERATION_PROMPTS.md").write_text("\n".join(video_prompt_lines), encoding="utf-8")
         
+        # [★ 구글 플로우(Google Flow) 첫 번째 프롬프트 복사 전용 일괄 텍스트 생성]
+        # OCEAN CODE LAB 숏츠 프롬프트.md 규격에 맞춰 플로우에 즉시 붙여넣을 수 있는 원문 파일 작성
+        flow_lines = [
+            f"The script is {len(script['scenes']) * 4} seconds long. Keep the script exactly as it is.",
+            "Analyze the script above, divide it into an appropriate number of scenes that follow the flow of the video, and write an image-generation prompt for each scene.",
+            "Each scene should run about 3 to 4 seconds and must never exceed 5 seconds.",
+            "Every image should look like a keyframe from a high-quality 3D infographic video that makes engineering principles, scientific principles, structures, mechanisms, historical facts, or everyday knowledge easy to understand visually.",
+            "Do not add any infographic elements yet: no explanatory text, subtitles, arrows, numbers, labels, or icons.",
+            "Write the prompts so that only the scene itself is generated: background, objects, structures, people, machines, natural phenomena.",
+            "\nCommon Style: Modern minimalist architectural cutaway, sleek clean aesthetic, bright daylight, crystal clear emerald turquoise water, smooth realistic white concrete structure, National Geographic educational documentary quality, Octane 3D render, highly detailed, 9:16 vertical video.\n"
+        ]
+        for idx, sc in enumerate(script["scenes"]):
+            sid = sc.get("id", idx + 1)
+            n_text = sc.get("narration", "").replace("\n", " ")
+            c_prompt = sc.get("clean_prompt") or sc.get("image_prompt", "")
+            flow_lines.append(f"{idx+1}. Scene {sid}")
+            flow_lines.append(f"시간: {idx*4}–{(idx+1)*4}")
+            flow_lines.append(f"대본: {n_text}")
+            flow_lines.append(f"이미지 프롬프트: {c_prompt}\n")
+
+        (prompts_dir / "FLOW_BATCH_PROMPTS.txt").write_text("\n".join(flow_lines), encoding="utf-8")
+
         # 다시 저장하여 clean_prompt, info_prompt 반영
         save_json(out_dir / "script.json", script)
-        log.info(f"✨ [Codex 연동] 매니페스트 및 3개 프롬프트 파일 저장 완료 ({manifests_dir}, {prompts_dir})")
+        log.info(f"✨ [Codex & Flow 연동] 매니페스트 및 플로우 일괄 프롬프트 파일 저장 완료 ({prompts_dir})")
     except Exception as ce:
         log.warning(f"Codex 매니페스트 생성 예외: {ce}")
 

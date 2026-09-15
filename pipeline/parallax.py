@@ -194,6 +194,8 @@ def render_parallax(img_path: Path, duration: float, out: Path, fps=30, mode=0,
             cropped = cv2.warpAffine(cropped, M, (w_c, h_c), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
             
         frame = cv2.resize(cropped, (W, H), interpolation=cv2.INTER_LINEAR)
+        # 밝고 선명한 3D 다큐멘터리 톤 보정 (감마 1.05 및 미세 대비 강화로 칙칙함 완전 차단)
+        frame = cv2.convertScaleAbs(frame, alpha=1.04, beta=5)
         proc.stdin.write(np.ascontiguousarray(frame).tobytes())
         
     proc.stdin.close(); proc.wait()

@@ -430,9 +430,16 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
             continue
 
         clean_p = clean_p_raw.strip().rstrip(".")
-        for ban in ["cross-section cutaway diagram", "cross-section", "cutaway diagram", "glowing red hydrodynamic wave pressure vectors", "glowing red pressure vectors", "technical HUD overlays"]:
-            clean_p = clean_p.replace(ban, "cinematic clear ocean perspective")
-        prompt = f"{clean_p}. {suffix}"
+        # 어둡고 낡은 구형 단면도 및 흙탕물/지저분한 암석 묘사 철저 필터링
+        for ban in ["cross-section cutaway diagram", "cross-section", "cutaway diagram", "glowing red hydrodynamic wave pressure vectors", "glowing red pressure vectors", "technical HUD overlays", "muddy water", "dark seabed", "gloomy"]:
+            clean_p = clean_p.replace(ban, "bright crystal clear emerald turquoise perspective")
+
+        # 코덱스 & 구글 플로우 표준 3D 공학 인포그래픽 프롬프트 주입
+        prompt = (
+            f"Bright modern 3D architectural model of coastal engineering structure, "
+            f"sunlit sparkling clear turquoise water, pristine smooth white concrete, "
+            f"{clean_p}. {suffix}"
+        )
         success = False
         clean_pil = None
 
@@ -442,48 +449,39 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
             clean_pil = Image.open(out_clean).convert("RGB")
             success = True
 
-
-        # 1차: AI 이미지 생성기 (Google Imagen 또는 DALL-E 3)
+        # 1차: AI 이미지 생성기 (Google Imagen 3 또는 DALL-E 3)
         for gen_name, gen_func in generators:
             try:
-                log.info(f"CLEAN 이미지 {sid}: {gen_name} 시도 중...")
+                log.info(f"CLEAN 이미지 {sid}: {gen_name} 호출 중...")
                 img_data = gen_func(prompt, cfg)
                 if img_data:
                     clean_pil = _fit(img_data, W, H)
-                    log.info(f"CLEAN 이미지 {sid} AI 생성 성공 ({gen_name})")
+                    log.info(f"CLEAN 이미지 {sid} AI 3D 렌더 생성 성공 ({gen_name})")
                     success = True
                     break
             except Exception as ge:
                 log.warning(f"CLEAN 이미지 {sid} {gen_name} 실패: {ge}")
 
-        # 2차: 단순화 프롬프트로 재시도
+        # 2차: 직관적 모던 3D 다큐멘터리 프롬프트로 재시도
         if not success:
-            log.info(f"CLEAN 이미지 {sid}: 핵심 해양 토목 키워드로 단순화 재시도...")
-            simple_prompt = f"Authentic 4k documentary photography of {topic}, {clean_p_raw[:180]}. {suffix}"
+            log.info(f"CLEAN 이미지 {sid}: 현대 3D 공학 건축 비주얼로 단순화 재시도...")
+            simple_prompt = (
+                f"Futuristic coastal civil engineering structure, modern clean 3D architectural render, "
+                f"bright sunlight, crystal clear emerald sea, smooth light-gray concrete, Octane Render, 8K documentary: {topic}, {clean_p_raw[:160]}"
+            )
             for gen_name, gen_func in generators:
                 try:
                     img_data = gen_func(simple_prompt, cfg)
                     if img_data:
                         clean_pil = _fit(img_data, W, H)
-                        log.info(f"CLEAN 이미지 {sid} 단순화 재시도 성공 ({gen_name})")
+                        log.info(f"CLEAN 이미지 {sid} 모던 3D 단순화 재시도 성공 ({gen_name})")
                         success = True
                         break
                 except Exception as ge2:
                     log.warning(f"CLEAN 이미지 {sid} {gen_name} 재시도 실패: {ge2}")
 
-        # 3차: 로컬 템플릿 풀 매핑 (해당 주제와 100% 일치하는 전용 템플릿만 허용 - 이종 주제 혼입 엄격 차단)
         if not success:
-            template_dir = ROOT / "assets" / "templates" / "coastal_engineering"
-            # 새만금 템플릿은 오직 '새만금' 주제일 때만 허용 (다른 방파제/케이슨 주제에 새만금 수문 사진 유출 차단)
-            if "새만금" in topic and template_dir.exists():
-                cand_tpl = template_dir / f"{sid}.png"
-                if cand_tpl.exists():
-                    log.info(f"CLEAN 이미지 {sid}: 새만금 전용 마스터 템플릿({cand_tpl.name}) 로드")
-                    clean_pil = Image.open(cand_tpl).convert("RGB")
-                    success = True
-
-        if not success:
-            raise RuntimeError(f"장면 {sid} 이미지 생성 실패: AI(Google Imagen / Gemini / DALL-E) 호출이 실패하였으며 해당 주제에 맞는 검증된 에셋이 없습니다. 서로 다른 장면에 같은 이미지를 중복 복제하는 왜곡을 방지하기 위해 중단합니다.")
+            raise RuntimeError(f"장면 {sid} 이미지 생성 실패: Google Imagen / Gemini / DALL-E 호출을 확인하세요. 낡고 어두운 템플릿 복제는 품질을 위해 완전 차단되었습니다.")
 
 
         # 이미지 크기를 설정된 W, H로 정확하게 리사이즈/크롭 보증 (렌더러/블렌드 필터 규격 일치)
