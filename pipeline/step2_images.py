@@ -18,53 +18,10 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
     client = genai.Client(api_key=api_key)
 
     ar = cfg.get("images", {}).get("aspect_ratio") or ("9:16" if cfg.get("current_format") == "shorts" else "16:9")
-    # 1. Gemini 멀티모달 generate_content (gemini-2.5-flash-image / gemini-3.1-flash-image-preview)
-    multimodal_models = [
-        "gemini-2.5-flash-image",
-        "gemini-3.1-flash-image-preview",
-        "gemini-3.1-flash-image",
-    ]
-    for fm in multimodal_models:
-        for attempt in range(2):
-            try:
-                log.info(f"Gemini({fm}, {ar}, 시도 {attempt+1}) 이미지 생성 호출: {clean_prompt[:60]}...")
-                resp = client.models.generate_content(
-                    model=fm,
-                    contents=clean_prompt,
-                    config=types.GenerateContentConfig(
-                        response_modalities=["IMAGE"],
-                        image_config=types.ImageConfig(aspect_ratio=ar)
-                    ),
-                )
-                # parts 탐색: resp.parts 및 resp.candidates[0].content.parts
-                parts_to_check = list(getattr(resp, "parts", []) or [])
-                if not parts_to_check and getattr(resp, "candidates", None):
-                    for cand in resp.candidates:
-                        if getattr(cand, "content", None) and getattr(cand.content, "parts", None):
-                            parts_to_check.extend(cand.content.parts)
-                for part in parts_to_check:
-                    if hasattr(part, "as_image"):
-                        try:
-                            pil_img = part.as_image()
-                            buf = io.BytesIO()
-                            pil_img.save(buf, format="PNG")
-                            return buf.getvalue()
-                        except Exception:
-                            pass
-                    inline_d = getattr(part, "inline_data", None)
-                    if inline_d and getattr(inline_d, "data", None):
-                        d = inline_d.data
-                        return base64.b64decode(d) if isinstance(d, str) else d
-            except Exception as ferr:
-                log.warning(f"Gemini generate_content({fm}) 시도 {attempt+1} 실패: {ferr}")
-                if "429" in str(ferr) or "RESOURCE_EXHAUSTED" in str(ferr):
-                    time.sleep(4 * (attempt + 1))
-                else:
-                    break
-
-    # 2. Imagen 3.0 / 4.0 models.generate_images
+    # 1. Google Imagen 3.0 / 4.0 models.generate_images (가장 안정적인 고화질 렌더러)
     imagen_models = [
         "imagen-3.0-generate-002",
+        "imagen-3.0-fast-generate-001",
         "imagen-4.0-generate-001",
     ]
     for m in imagen_models:
@@ -96,6 +53,50 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
                     time.sleep(3 * (attempt + 1))
                 else:
                     break
+
+    # 2. Gemini 멀티모달 generate_content (gemini-2.5-flash-image)
+    multimodal_models = [
+        "gemini-2.5-flash-image",
+        "gemini-2.5-flash",
+    ]
+    for fm in multimodal_models:
+        for attempt in range(2):
+            try:
+                log.info(f"Gemini({fm}, {ar}, 시도 {attempt+1}) 이미지 생성 호출: {clean_prompt[:60]}...")
+                resp = client.models.generate_content(
+                    model=fm,
+                    contents=clean_prompt,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["IMAGE"],
+                        image_config=types.ImageConfig(aspect_ratio=ar)
+                    ),
+                )
+                parts_to_check = list(getattr(resp, "parts", []) or [])
+                if not parts_to_check and getattr(resp, "candidates", None):
+                    for cand in resp.candidates:
+                        if getattr(cand, "content", None) and getattr(cand.content, "parts", None):
+                            parts_to_check.extend(cand.content.parts)
+                for part in parts_to_check:
+                    if hasattr(part, "as_image"):
+                        try:
+                            pil_img = part.as_image()
+                            buf = io.BytesIO()
+                            pil_img.save(buf, format="PNG")
+                            return buf.getvalue()
+                        except Exception:
+                            pass
+                    inline_d = getattr(part, "inline_data", None)
+                    if inline_d and getattr(inline_d, "data", None):
+                        d = inline_d.data
+                        return base64.b64decode(d) if isinstance(d, str) else d
+            except Exception as ferr:
+                log.warning(f"Gemini generate_content({fm}) 시도 {attempt+1} 실패: {ferr}")
+                if "429" in str(ferr) or "RESOURCE_EXHAUSTED" in str(ferr):
+                    time.sleep(3 * (attempt + 1))
+                else:
+                    break
+
+
 
     # 3. Interactions API
     interactions_models = ["gemini-3.1-flash-image-preview", "gemini-3.1-flash-image", "gemini-3-pro-image-preview"]
