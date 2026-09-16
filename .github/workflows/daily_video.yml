@@ -187,7 +187,8 @@ jobs:
 
       - name: 의존성 설치
         run: |
-          pip install --quiet opencv-python-headless pillow numpy pyyaml python-dotenv google-genai google-api-python-client google-auth-oauthlib
+          pip install --quiet opencv-python-headless pillow numpy pyyaml python-dotenv google-api-python-client google-auth-oauthlib
+          pip install --quiet --upgrade google-genai
 
       - name: 기획 데이터 복원
         uses: actions/download-artifact@v4

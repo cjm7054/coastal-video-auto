@@ -482,50 +482,21 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
                     log.warning(f"CLEAN 이미지 {sid} {gen_name} 재시도 실패: {ge2}")
 
         if not success:
-            log.warning(f"⚠️ 장면 {sid} AI 이미지 API 호출 불가 → 밝고 선명한 모던 3D 에메랄드 해양 그래픽스 엔진 가동")
+            log.warning(f"⚠️ 장면 {sid} AI 이미지 API 호출 불가 → 기존 템플릿 사용으로 폴백")
             # 낡고 어두운 과거 템플릿 대신, 최신 3D 건축 모형 및 투명한 에메랄드 바다 그라데이션 렌더링
-            from PIL import ImageDraw
-            fallback_img = Image.new("RGB", (W, H), (12, 35, 60))
-            f_draw = ImageDraw.Draw(fallback_img)
-            # 맑은 하늘에서 에메랄드 청록색 바다로 이어지는 밝은 그래디언트
-            for y in range(H):
-                ratio = y / H
-                if ratio < 0.45: # 밝은 대낮 하늘
-                    r = int(180 + 40 * (1 - ratio/0.45))
-                    g = int(225 + 25 * (1 - ratio/0.45))
-                    b = int(250)
-                else: # 투명한 에메랄드 바다
-                    w_r = (ratio - 0.45) / 0.55
-                    r = int(10 + 20 * (1 - w_r))
-                    g = int(150 + 40 * (1 - w_r))
-                    b = int(170 + 30 * (1 - w_r))
-                f_draw.line([(0, y), (W, y)], fill=(r, g, b))
-            
-            # 모던 화이트 3D 토목 케이슨/방파제 기하 구조물 렌더링
-            struct_top = int(H * 0.42)
-            struct_bot = int(H * 0.72)
-            cx = W // 2
-            # 현대적 콘크리트 상판
-            f_draw.polygon([
-                (cx - int(W * 0.4), struct_top + int(H * 0.08)),
-                (cx, struct_top),
-                (cx + int(W * 0.4), struct_top + int(H * 0.08)),
-                (cx, struct_top + int(H * 0.16))
-            ], fill=(235, 240, 248), outline=(255, 255, 255))
-            # 좌측 측면
-            f_draw.polygon([
-                (cx - int(W * 0.4), struct_top + int(H * 0.08)),
-                (cx, struct_top + int(H * 0.16)),
-                (cx, struct_bot),
-                (cx - int(W * 0.4), struct_bot - int(H * 0.08))
-            ], fill=(190, 205, 220), outline=(220, 230, 240))
-            # 우측 측면
-            f_draw.polygon([
-                (cx, struct_top + int(H * 0.16)),
-                (cx + int(W * 0.4), struct_top + int(H * 0.08)),
-                (cx + int(W * 0.4), struct_bot - int(H * 0.08)),
-                (cx, struct_bot)
-            ], fill=(150, 170, 190), outline=(200, 215, 230))
+            # (수정) 하얀 화면 대신 기존 assets/templates/coastal_engineering 폴더의 파일을 사용하여 최소한의 시각적 품질 유지
+            template_path = ROOT / "assets" / "templates" / "coastal_engineering" / f"{sid}.png"
+            if template_path.exists():
+                fallback_img = Image.open(template_path).convert("RGB")
+            else:
+                fallback_img = Image.new("RGB", (W, H), (12, 35, 60))
+                # 템플릿이 없을 경우를 대비한 최소한의 그래픽
+                from PIL import ImageDraw
+                f_draw = ImageDraw.Draw(fallback_img)
+                f_draw.rectangle([(0, H//2), (W, H)], fill=(20, 80, 100))
+                f_draw.text((W//2 - 50, H//2 - 20), f"Scene {sid}", fill=(255, 255, 255))
+
+
             
             clean_pil = fallback_img
             success = True
