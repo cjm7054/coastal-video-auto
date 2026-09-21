@@ -35,9 +35,9 @@ def generate_motion_clips(script: dict, out_dir: Path) -> dict:
     
     for sc in targets:
         out = out_dir / "videos" / f"{sc['id']}.mp4"
-        if out.exists():
-            result[sc["id"]] = out
-            continue
+        # if out.exists():
+        #     result[sc["id"]] = out
+        #     continue
         clean_img_path = out_dir / "clean" / f"{sc['id']}.png"
         img_path = clean_img_path if clean_img_path.exists() else out_dir / "images" / f"{sc['id']}.png"
         if not img_path.exists():

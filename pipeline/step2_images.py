@@ -426,9 +426,9 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
         out_clean = clean_dir / f"{sid}.png"
         out_info = info_dir / f"{sid}.png"
         
-        if out_main.exists() and out_clean.exists() and out_info.exists():
-            paths.append(out_main)
-            continue
+        # if out_main.exists() and out_clean.exists() and out_info.exists():
+        #     paths.append(out_main)
+        #     continue
 
         clean_p = clean_p_raw.strip().rstrip(".")
         # 어둡고 낡은 구형 단면도 및 흙탕물/지저분한 암석 묘사 철저 필터링
@@ -445,10 +445,10 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
         clean_pil = None
 
         # 0차: 이미 현재 작업 폴더에 고화질 3D 실사 이미지가 생성되어 있는 경우 즉시 활용
-        if out_clean.exists() and out_clean.stat().st_size > 10000:
-            log.info(f"CLEAN 이미지 {sid}: 이미 생성된 고화질 에셋 활용")
-            clean_pil = Image.open(out_clean).convert("RGB")
-            success = True
+        # if out_clean.exists() and out_clean.stat().st_size > 10000:
+        #     log.info(f"CLEAN 이미지 {sid}: 이미 생성된 고화질 에셋 활용")
+        #     clean_pil = Image.open(out_clean).convert("RGB")
+        #     success = True
 
         # 1차: AI 이미지 생성기 (Google Imagen 3 또는 DALL-E 3)
         for gen_name, gen_func in generators:
