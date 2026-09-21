@@ -20,6 +20,7 @@ def _gemini(prompt: str, cfg: dict) -> bytes:
     ar = cfg.get("images", {}).get("aspect_ratio") or ("9:16" if cfg.get("current_format") == "shorts" else "16:9")
     # 1. Google Imagen 3.0 / 4.0 models.generate_images (가장 안정적인 고화질 렌더러)
     imagen_models = [
+        "imagen-3.0-generate-001",
         "imagen-3.0-generate-002",
         "imagen-3.0-fast-generate-001",
         "imagen-4.0-generate-001",
