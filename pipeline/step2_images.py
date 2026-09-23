@@ -1,220 +1,123 @@
-"""2단계: 장면별 이미지 생성 (Gemini 또는 OpenAI). MD 규격 CLEAN & INFO 2-Pass 공학 인포그래픽 연동."""
-import os, time, base64, io, shutil, urllib.parse, math, requests
+"""2단계: 장면별 이미지 생성. MD 규격 CLEAN & INFO 2-Pass 공학 인포그래픽 연동.
+
+원칙
+- 실패를 숨기지 않는다: 이미지가 한 장이라도 생성되지 않으면 예외를 던져 업로드를 막는다.
+  (예전에는 새만금 템플릿 8장으로 조용히 대체되어 매번 같은 그림이 올라갔음)
+- 그림체 통일: 첫 장면 이미지를 '스타일 기준(reference)'으로 삼아 이후 장면에 함께 넣는다(Gemini).
+"""
+import os, re, time, base64, io, shutil, urllib.parse, math, requests, hashlib
 from pathlib import Path
 from PIL import Image
 from .common import load_config, ROOT, log
 
 
+class ImageGenError(RuntimeError):
+    pass
 
-def _gemini(prompt: str, cfg: dict) -> bytes:
-    """Google Gemini & Imagen 공식 이미지 생성 API (generate_images / generate_content / Interactions API)"""
+
+def _is_quota(err) -> bool:
+    s = str(err)
+    return "429" in s or "RESOURCE_EXHAUSTED" in s or "rate limit" in s.lower()
+
+
+def _extract_image_bytes(resp) -> bytes | None:
+    parts = list(getattr(resp, "parts", None) or [])
+    if not parts:
+        for cand in getattr(resp, "candidates", None) or []:
+            content = getattr(cand, "content", None)
+            if content and getattr(content, "parts", None):
+                parts.extend(content.parts)
+    for part in parts:
+        inline = getattr(part, "inline_data", None)
+        if inline and getattr(inline, "data", None):
+            d = inline.data
+            return base64.b64decode(d) if isinstance(d, str) else d
+    return None
+
+
+def _gemini(prompt: str, cfg: dict, style_ref: bytes | None = None) -> bytes:
+    """Gemini 이미지 모델(generate_content). 유료(결제 등록) API 키 필요 — 무료 등급은 이미지 한도 0."""
     from google import genai
     from google.genai import types
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
-        raise ValueError("GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
-    
-    clean_prompt = prompt[:900]
+        raise ImageGenError("GEMINI_API_KEY 미설정")
     client = genai.Client(api_key=api_key)
-
-    ar = cfg.get("images", {}).get("aspect_ratio") or ("9:16" if cfg.get("current_format") == "shorts" else "16:9")
-    # 1. Google Imagen 3.0 / 4.0 models.generate_images (가장 안정적인 고화질 렌더러)
-    imagen_models = [
-        "imagen-3.0-generate-001",
-        "imagen-3.0-generate-002",
-        "imagen-3.0-fast-generate-001",
-        "imagen-4.0-generate-001",
-    ]
-    for m in imagen_models:
-        for attempt in range(2):
-            try:
-                log.info(f"Google Imagen({m}, {ar}, 시도 {attempt+1}) 호출...")
-                resp = client.models.generate_images(
-                    model=m,
-                    prompt=clean_prompt,
-                    config=types.GenerateImagesConfig(
-                        number_of_images=1,
-                        aspect_ratio=ar,
-                        output_mime_type="image/jpeg",
-                    ),
-                )
-                if resp and resp.generated_images:
-                    img_wrapper = resp.generated_images[0]
-                    img_obj = getattr(img_wrapper, "image", img_wrapper)
-                    raw = getattr(img_obj, "image_bytes", None) or getattr(img_obj, "_image_bytes", None)
-                    if raw:
-                        return base64.b64decode(raw) if isinstance(raw, str) else raw
-                    if hasattr(img_obj, "save"):
-                        buf = io.BytesIO()
-                        img_obj.save(buf, format="JPEG")
-                        return buf.getvalue()
-            except Exception as err:
-                log.warning(f"Google Imagen({m}) 실패 상세: {type(err).__name__}: {err}")
-                if "429" in str(err) or "RESOURCE_EXHAUSTED" in str(err):
-                    time.sleep(3 * (attempt + 1))
-                else:
-                    break
-
-    # 2. Gemini 멀티모달 generate_content (gemini-2.5-flash-image)
-    multimodal_models = [
+    ar = cfg["images"].get("aspect_ratio", "16:9")
+    models = cfg["images"].get("gemini_models") or [
+        "gemini-3.1-flash-image-preview",
         "gemini-2.5-flash-image",
-        "gemini-2.5-flash",
     ]
-    for fm in multimodal_models:
-        for attempt in range(2):
+    contents = []
+    if style_ref:
+        contents.append(types.Part.from_bytes(data=style_ref, mime_type="image/png"))
+        contents.append(
+            "Use the attached image ONLY as the visual style reference (same rendering style, "
+            "color palette, lighting, material look and level of detail). Draw a NEW scene:\n" + prompt
+        )
+    else:
+        contents.append(prompt)
+
+    last = None
+    for m in models:
+        for attempt in range(3):
             try:
-                log.info(f"Gemini({fm}, {ar}, 시도 {attempt+1}) 이미지 생성 호출: {clean_prompt[:60]}...")
                 resp = client.models.generate_content(
-                    model=fm,
-                    contents=clean_prompt,
+                    model=m,
+                    contents=contents,
                     config=types.GenerateContentConfig(
                         response_modalities=["IMAGE"],
-                        image_config=types.ImageConfig(aspect_ratio=ar)
+                        image_config=types.ImageConfig(aspect_ratio=ar),
                     ),
                 )
-                parts_to_check = list(getattr(resp, "parts", []) or [])
-                if not parts_to_check and getattr(resp, "candidates", None):
-                    for cand in resp.candidates:
-                        if getattr(cand, "content", None) and getattr(cand.content, "parts", None):
-                            parts_to_check.extend(cand.content.parts)
-                for part in parts_to_check:
-                    if hasattr(part, "as_image"):
-                        try:
-                            pil_img = part.as_image()
-                            buf = io.BytesIO()
-                            pil_img.save(buf, format="PNG")
-                            return buf.getvalue()
-                        except Exception:
-                            pass
-                    inline_d = getattr(part, "inline_data", None)
-                    if inline_d and getattr(inline_d, "data", None):
-                        d = inline_d.data
-                        return base64.b64decode(d) if isinstance(d, str) else d
-            except Exception as ferr:
-                log.warning(f"Gemini generate_content({fm}) 시도 {attempt+1} 실패: {ferr}")
-                if "429" in str(ferr) or "RESOURCE_EXHAUSTED" in str(ferr):
-                    time.sleep(3 * (attempt + 1))
-                else:
-                    break
+                data = _extract_image_bytes(resp)
+                if data:
+                    log.info(f"Gemini 이미지 생성 성공 ({m})")
+                    return data
+                last = f"{m}: 응답에 이미지 없음"
+                break
+            except Exception as e:
+                last = f"{m}: {e}"
+                if _is_quota(e) and "limit: 0" in str(e):
+                    raise ImageGenError(
+                        "Gemini API 키가 무료 등급이라 이미지 생성 한도가 0입니다. "
+                        "Google AI Studio에서 이 키의 프로젝트에 결제를 등록하세요."
+                    )
+                if _is_quota(e):
+                    time.sleep(10 * (attempt + 1))
+                    continue
+                break
+    raise ImageGenError(f"Gemini 이미지 생성 실패 → {str(last)[:300]}")
 
 
-
-    # 3. Interactions API
-    interactions_models = ["gemini-3.1-flash-image-preview", "gemini-3.1-flash-image", "gemini-3-pro-image-preview"]
-    for im in interactions_models:
-        try:
-            log.info(f"Interactions API({im}) 시도...")
-            interaction = client.interactions.create(
-                model=im,
-                input=clean_prompt,
-                response_modalities=["IMAGE"],
-            )
-            for out in getattr(interaction, "outputs", []):
-                if getattr(out, "type", "") == "image":
-                    d = getattr(out, "data", None)
-                    if d:
-                        return base64.b64decode(d) if isinstance(d, str) else d
-        except Exception as ierr:
-            log.warning(f"Interactions API({im}) 시도 실패: {ierr}")
-
-    # 4. Google Gemini OpenAI 호환 엔드포인트
-    try:
-        from openai import OpenAI
-        log.info("Google Gemini OpenAI-compatible 엔드포인트 시도...")
-        oai_client = OpenAI(
-            api_key=api_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-        )
-        r = oai_client.images.generate(
-            model="gemini-2.5-flash-image",
-            prompt=clean_prompt,
-            size="1024x1024",
-            response_format="b64_json",
-        )
-        item = r.data[0]
-        if getattr(item, "b64_json", None):
-            return base64.b64decode(item.b64_json)
-    except Exception as oe:
-        log.warning(f"Google Gemini OpenAI 호환 호출 실패: {oe}")
-
-    raise RuntimeError("Google Gemini / Imagen 이미지 생성 전체 실패")
-
-
-def _openai(prompt: str, cfg: dict) -> bytes:
+def _openai(prompt: str, cfg: dict, style_ref: bytes | None = None) -> bytes:
+    """OpenAI gpt-image 계열 (dall-e-2/3은 서비스 종료)."""
     from openai import OpenAI
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
-        raise ValueError("OPENAI_API_KEY 환경변수가 설정되지 않았습니다.")
+        raise ImageGenError("OPENAI_API_KEY 미설정")
     client = OpenAI(api_key=api_key)
-    
-    clean_prompt = prompt[:950]
-    dalle_size = cfg.get("images", {}).get("dalle_size") or ("1024x1792" if cfg.get("current_format") == "shorts" else "1792x1024")
-    
-    # 1. DALL-E 3 네이티브 비율 + HD
-    try:
-        log.info(f"OpenAI(dall-e-3 {dalle_size} HD) 호출: {clean_prompt[:70]}...")
-        r = client.images.generate(
-            model="dall-e-3",
-            prompt=clean_prompt,
-            size=dalle_size,
-            quality="hd",
-        )
-        if r and r.data:
-            item = r.data[0]
-            try:
-                from .cost_tracker import tracker
-                tracker.track_openai_image(model="dall-e-3", count=1)
-            except Exception:
-                pass
-            b64 = getattr(item, "b64_json", None)
+    W, H = cfg["images"]["width"], cfg["images"]["height"]
+    size = "1536x1024" if W >= H else "1024x1536"
+    quality = cfg["images"].get("openai_quality", "medium")
+    models = cfg["images"].get("openai_models") or ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
+    last = None
+    for m in models:
+        try:
+            r = client.images.generate(model=m, prompt=prompt[:3800], size=size, quality=quality, n=1)
+            b64 = r.data[0].b64_json
             if b64:
+                log.info(f"OpenAI 이미지 생성 성공 ({m}, {size}, {quality})")
+                try:
+                    from .cost_tracker import tracker
+                    tracker.track_openai_image(model=m, count=1, resolution=size)
+                except Exception:
+                    pass
                 return base64.b64decode(b64)
-            url = getattr(item, "url", None)
-            if url:
-                resp = requests.get(url, timeout=60)
-                if resp.status_code == 200:
-                    return resp.content
-    except Exception as me:
-        log.warning(f"DALL-E 3 {dalle_size} HD 생성 실패: {me} → 표준 모드로 재시도")
-
-    # 2. DALL-E 3 표준 백업
-    try:
-        fallback_size = dalle_size if dalle_size in ["1024x1792", "1792x1024"] else "1024x1024"
-        r = client.images.generate(
-            model="dall-e-3",
-            prompt=clean_prompt,
-            size=fallback_size,
-            quality="standard",
-        )
-        if r and r.data:
-            item = r.data[0]
-            url = getattr(item, "url", None)
-            if url:
-                resp = requests.get(url, timeout=60)
-                if resp.status_code == 200:
-                    return resp.content
-    except Exception as de:
-        log.warning(f"DALL-E 3 표준 모드 실패: {de}")
-
-    # 3. DALL-E 2 백업 (1024x1024)
-    try:
-        log.info(f"OpenAI(dall-e-2 1024x1024) 폴백 시도...")
-        r = client.images.generate(
-            model="dall-e-2",
-            prompt=clean_prompt[:900],
-            size="1024x1024",
-        )
-        if r and r.data:
-            item = r.data[0]
-            url = getattr(item, "url", None)
-            if url:
-                resp = requests.get(url, timeout=60)
-                if resp.status_code == 200:
-                    return resp.content
-    except Exception as d2e:
-        log.warning(f"DALL-E 2 폴백 실패: {d2e}")
-
-    raise RuntimeError("OpenAI 이미지 데이터 수신 실패")
+        except Exception as e:
+            last = f"{m}: {e}"
+            log.warning(f"OpenAI {m} 실패: {str(e)[:200]}")
+    raise ImageGenError(f"OpenAI 이미지 생성 실패 → {str(last)[:300]}")
 
 
 def _fit(data: bytes, w: int, h: int) -> Image.Image:
@@ -384,6 +287,11 @@ def _draw_engineering_info_overlay(clean_img: Image.Image, sc: dict) -> Image.Im
     return info_img
 
 
+def simple_prompt_for(topic: str, raw: str) -> str:
+    return (f"Clean modern 3D illustrated cutaway of a coastal engineering structure, bright daylight, "
+            f"clear turquoise sea, smooth light-gray concrete, documentary infographic style, no text: {topic}, {raw[:200]}")
+
+
 def generate_images(script: dict, out_dir: Path) -> list[Path]:
     """MD 규격 완벽 준수:
     1. 각 장면마다 순수 3D 실사 렌더링 'clean/{id}.png' (Stage 2) 생성
@@ -401,13 +309,11 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
     clean_dir.mkdir(parents=True, exist_ok=True)
     info_dir.mkdir(parents=True, exist_ok=True)
     
-    generators = []
-    if provider == "gemini":
-        generators = [("Google Imagen/Gemini", _gemini), ("OpenAI DALL-E", _openai)]
-    elif provider == "openai":
-        generators = [("OpenAI DALL-E", _openai), ("Google Imagen/Gemini", _gemini)]
-    else:
-        generators = [("Google Imagen/Gemini", _gemini), ("OpenAI DALL-E", _openai)]
+    order = {"gemini": [("Gemini", _gemini), ("OpenAI", _openai)],
+             "openai": [("OpenAI", _openai), ("Gemini", _gemini)]}
+    generators = order.get(provider, order["gemini"])
+    style_ref = None
+    seen_hashes = {}
 
     suffix = cfg["images"]["style_suffix"].strip()
     paths = []
@@ -432,77 +338,48 @@ def generate_images(script: dict, out_dir: Path) -> list[Path]:
         #     continue
 
         clean_p = clean_p_raw.strip().rstrip(".")
-        # 어둡고 낡은 구형 단면도 및 흙탕물/지저분한 암석 묘사 철저 필터링
-        for ban in ["cross-section cutaway diagram", "cross-section", "cutaway diagram", "glowing red hydrodynamic wave pressure vectors", "glowing red pressure vectors", "technical HUD overlays", "muddy water", "dark seabed", "gloomy"]:
-            clean_p = clean_p.replace(ban, "bright crystal clear emerald turquoise perspective")
+        # 흙탕물·어두운 분위기만 걸러낸다 (단면도/컷어웨이는 신비한 건축사전 스타일의 핵심이므로 유지)
+        for ban in ["muddy water", "gloomy"]:
+            clean_p = clean_p.replace(ban, "clear water")
 
         # 코덱스 & 구글 플로우 표준 3D 공학 인포그래픽 프롬프트 주입
         prompt = (
-            f"Bright modern 3D architectural model of coastal engineering structure, "
-            f"sunlit sparkling clear turquoise water, pristine smooth white concrete, "
             f"{clean_p}. {suffix}"
         )
-        success = False
         clean_pil = None
-
-        # 0차: 이미 현재 작업 폴더에 고화질 3D 실사 이미지가 생성되어 있는 경우 즉시 활용
-        # if out_clean.exists() and out_clean.stat().st_size > 10000:
-        #     log.info(f"CLEAN 이미지 {sid}: 이미 생성된 고화질 에셋 활용")
-        #     clean_pil = Image.open(out_clean).convert("RGB")
-        #     success = True
-
-        # 1차: AI 이미지 생성기 (Google Imagen 3 또는 DALL-E 3)
+        errors = []
+        use_ref = style_ref if sid != "thumb" else None
         for gen_name, gen_func in generators:
-            try:
-                log.info(f"CLEAN 이미지 {sid}: {gen_name} 호출 중...")
-                img_data = gen_func(prompt, cfg)
-                if img_data:
-                    clean_pil = _fit(img_data, W, H)
-                    log.info(f"CLEAN 이미지 {sid} AI 3D 렌더 생성 성공 ({gen_name})")
-                    success = True
-                    break
-            except Exception as ge:
-                log.warning(f"CLEAN 이미지 {sid} {gen_name} 실패: {ge}")
-
-        # 2차: 직관적 모던 3D 다큐멘터리 프롬프트로 재시도
-        if not success:
-            log.info(f"CLEAN 이미지 {sid}: 현대 3D 공학 건축 비주얼로 단순화 재시도...")
-            simple_prompt = (
-                f"Futuristic coastal civil engineering structure, modern clean 3D architectural render, "
-                f"bright sunlight, crystal clear emerald sea, smooth light-gray concrete, Octane Render, 8K documentary: {topic}, {clean_p_raw[:160]}"
-            )
-            for gen_name, gen_func in generators:
+            for p_try in (prompt, simple_prompt_for(topic, clean_p_raw)):
                 try:
-                    img_data = gen_func(simple_prompt, cfg)
-                    if img_data:
-                        clean_pil = _fit(img_data, W, H)
-                        log.info(f"CLEAN 이미지 {sid} 모던 3D 단순화 재시도 성공 ({gen_name})")
-                        success = True
-                        break
-                except Exception as ge2:
-                    log.warning(f"CLEAN 이미지 {sid} {gen_name} 재시도 실패: {ge2}")
+                    log.info(f"CLEAN 이미지 {sid}: {gen_name} 호출 중...")
+                    img_data = gen_func(p_try, cfg, use_ref)
+                    clean_pil = _fit(img_data, W, H)
+                    break
+                except ImageGenError as ge:
+                    errors.append(f"{gen_name}: {ge}")
+                    log.warning(f"CLEAN 이미지 {sid} {gen_name} 실패: {ge}")
+                    if "한도가 0" in str(ge) or "미설정" in str(ge):
+                        break  # 프롬프트를 바꿔도 소용없는 오류
+                except Exception as ge:
+                    errors.append(f"{gen_name}: {ge}")
+                    log.warning(f"CLEAN 이미지 {sid} {gen_name} 실패: {ge}")
+            if clean_pil is not None:
+                break
 
-        if not success:
-            log.warning(f"⚠️ 장면 {sid} AI 이미지 API 호출 불가 → 기존 템플릿 사용으로 폴백")
-            # 낡고 어두운 과거 템플릿 대신, 최신 3D 건축 모형 및 투명한 에메랄드 바다 그라데이션 렌더링
-            # (수정) 하얀 화면 대신 기존 assets/templates/coastal_engineering 폴더의 파일을 사용하여 최소한의 시각적 품질 유지
-            template_path = ROOT / "assets" / "templates" / "coastal_engineering" / f"{sid}.png"
-            if template_path.exists():
-                fallback_img = Image.open(template_path).convert("RGB")
-            else:
-                fallback_img = Image.new("RGB", (W, H), (12, 35, 60))
-                # 템플릿이 없을 경우를 대비한 최소한의 그래픽
-                from PIL import ImageDraw
-                f_draw = ImageDraw.Draw(fallback_img)
-                f_draw.rectangle([(0, H//2), (W, H)], fill=(20, 80, 100))
-                f_draw.text((W//2 - 50, H//2 - 20), f"Scene {sid}", fill=(255, 255, 255))
+        if clean_pil is None:
+            # 템플릿 대체 금지: 같은 그림이 반복 업로드되는 것을 막기 위해 여기서 중단한다.
+            raise ImageGenError(f"장면 {sid} 이미지 생성 실패 — 업로드 중단.\n" + "\n".join(errors[-4:]))
 
+        # 같은 이미지가 반복되면(캐시/폴백 오류) 중단
+        digest = hashlib.md5(clean_pil.resize((64, 36)).tobytes()).hexdigest()
+        if digest in seen_hashes:
+            raise ImageGenError(f"장면 {sid} 이미지가 장면 {seen_hashes[digest]}와 동일 — 업로드 중단")
+        seen_hashes[digest] = sid
 
-            
-            clean_pil = fallback_img
-            success = True
-            log.info(f"CLEAN 이미지 {sid}: 고화질 모던 3D 공학 그래픽 자동 렌더링 성공")
-
+        # 첫 본편 장면을 스타일 기준으로 저장 (이후 장면 그림체 통일)
+        if style_ref is None and sid != "thumb" and cfg["images"].get("style_reference", True):
+            buf = io.BytesIO(); clean_pil.resize((W // 2, H // 2)).save(buf, "PNG"); style_ref = buf.getvalue()
 
         # 이미지 크기를 설정된 W, H로 정확하게 리사이즈/크롭 보증 (렌더러/블렌드 필터 규격 일치)
         if clean_pil.size != (W, H):

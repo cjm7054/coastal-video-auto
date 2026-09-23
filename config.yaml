@@ -44,17 +44,19 @@ script:
     지적이고 묵직하며 몰입감 넘치는 명품 다큐멘터리를 전개한다.
 
 images:
-  provider: "gemini"                 # gemini (Google Imagen 3/4) | openai (DALL-E 3)
-  gemini_model: "imagen-3.0-generate-002"
-  openai_model: "dall-e-3"
-  # 코덱스 & 구글 플로우 표준 3D 공학 인포그래픽 스타일 (Clean Minimalism & Bright Modern Aesthetic)
+  provider: "gemini"                 # gemini (결제 등록된 키 필요) | openai (gpt-image)
+  gemini_models: ["gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"]
+  openai_models: ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
+  openai_quality: "medium"
+  style_reference: true              # 첫 장면을 기준으로 이후 장면 그림체 통일 (Gemini)
+  # '신비한 건축사전' 계열: 깔끔한 3D 일러스트 단면도(컷어웨이) + 밝은 교육용 다큐 톤
   style_suffix: >
-    Modern futuristic civil engineering 3D architectural model, ultra-sleek clean aesthetic,
-    bright daylight studio lighting, sunlit crystal clear transparent emerald turquoise ocean water,
-    smooth pristine white and light gray concrete architectural structure, elegant ambient occlusion,
-    National Geographic educational documentary quality, Octane 3D render, crisp 8K resolution,
-    vivid contrast, completely clean visual, no dark mud, no dirty rocks, no gloomy shadows,
-    absolutely no text, no letters, no labels, no watermark, no hud, no arrows, no red lines
+    Stylized 3D illustrated cutaway cross-section in the style of a high-end educational
+    engineering documentary: the structure is sliced open so the inside and the seabed layers
+    below the waterline are visible, clean matte materials, soft global illumination,
+    bright clear turquoise water, readable forms and strong silhouette, consistent camera
+    height, cinematic 16:9 composition with empty space for captions, highly detailed but uncluttered,
+    absolutely no text, no letters, no labels, no numbers, no watermark, no logos
 
 tts:
   provider: "typecast"               # typecast(유료 모건 보이스) | edge(무료) | elevenlabs(유료)
@@ -67,7 +69,7 @@ tts:
   elevenlabs_model: "eleven_multilingual_v2"
 
 video_gen:                           # 구글 플로우 / Veo / Gemini Omni Flash 비디오 생성 연동
-  enabled: true
+  enabled: false                     # 최소 비용 모드: 영상 클립 생성 끔 (패럴랙스 카메라 무빙 사용)
   model: "gemini-omni-1.1-flash"     # gemini-omni-1.1-flash | veo-3.1-generate-preview
   max_scenes: 8
   seconds: 4                         # 플로우 4초 클립 규격
