@@ -7,8 +7,8 @@ format: "longform"                   # "longform" (가로 16:9 다큐) | "shorts
 
 formats:
   longform:
-    target_minutes: 3.8                # 3.5~4.5분 롱폼 고밀도 다큐멘터리
-    scenes: 26                         # 26개 씬 (장면당 약 8초)
+    target_minutes: 6                  # 5~8분 롱폼 다큐멘터리 (매일 자동 업로드 기준)
+    scenes: 42                         # 42개 씬 (장면당 약 8~9초)
     width: 1920
     height: 1080
     aspect_ratio: "16:9"

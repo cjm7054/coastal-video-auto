@@ -32,8 +32,8 @@ def main():
         if "format" in script_data:
             set_active_format(script_data["format"])
     else:
-        # 터미널에서 대화형 입력이 가능한 환경일 때만 대화형 선택창 노출 (CI/헤드리스 환경에서는 shorts 기본)
-        default_fmt = "shorts"
+        # 터미널에서 대화형 입력이 가능한 환경일 때만 대화형 선택창 노출 (CI/헤드리스 환경에서는 config.yaml의 format 사용)
+        default_fmt = load_config().get("format", "longform")
         if sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
             print("\n" + "=" * 60)
             print("🎬 [OCEAN CODE LAB] 영상 제작 포맷을 선택하세요:")
