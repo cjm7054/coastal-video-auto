@@ -66,11 +66,11 @@ tts:
   elevenlabs_voice_id: ""
   elevenlabs_model: "eleven_multilingual_v2"
 
-video_gen:                           # 구글 플로우 / Veo / Seedance 비디오 생성 연동
+video_gen:                           # 구글 플로우 / Veo / Gemini Omni Flash 비디오 생성 연동
   enabled: true
-  model: "seedance_2.5"              # gemini-omni-1.1-flash | veo-3.1-generate-preview | seedance_2.5
+  model: "gemini-omni-1.1-flash"     # gemini-omni-1.1-flash | veo-3.1-generate-preview
   max_scenes: 8
-  seconds: 30                        # Seedance 2.5 30초 롱테이크
+  seconds: 4                         # 플로우 4초 클립 규격
   resolution: "1080p"
   slow_factor: 1.0
   style_suffix: "smooth cinematic 3D camera pan, bright daylight, sparkling clear water, dynamic engineering simulation"
