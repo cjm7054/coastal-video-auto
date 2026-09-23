@@ -1,7 +1,6 @@
-"""2-1단계: 대본에서 motion=true인 장면만 Seedance 2.5 (30s) 비디오 생성.
-정지 이미지를 레퍼런스로 넣어 장면 일관성을 유지하며 30초 롱테이크를 생성합니다.
-(Antigravity CLI `agy`를 통해 시스템 내장 도구를 호출합니다)"""
-import os, time, subprocess
+"""2-1단계: 대본에서 motion=true인 장면만 Veo 3.1 Lite image-to-video로 8초 클립 생성.
+정지 이미지를 첫 프레임으로 넣어 장면 일관성을 유지한다. 실패하면 그 장면은 패럴랙스로 대체."""
+import os, time
 from pathlib import Path
 from .common import load_config, log
 
@@ -12,32 +11,40 @@ def generate_motion_clips(script: dict, out_dir: Path) -> dict:
     vcfg = cfg["video_gen"]
     if not vcfg.get("enabled", True):
         return {}
-        
+    try:
+        from google import genai
+        from google.genai import types
+        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if not api_key:
+            log.warning("GEMINI_API_KEY 미설정 → 고화질 3D 패럴랙스 렌더로 자동 대체")
+            return {}
+        client = genai.Client(api_key=api_key)
+    except Exception as ge:
+        log.warning(f"Google GenAI SDK 로드 불가({ge}) → 고화질 3D 패럴랙스 렌더로 자동 대체")
+        return {}
     (out_dir / "videos").mkdir(exist_ok=True)
-    
     # motion이 명시된 장면 우선, 없으면 시각적 설명이 풍부한 전반부/중반부 장면 선택
     targets = [s for s in script["scenes"] if s.get("motion")]
     if len(targets) < vcfg["max_scenes"]:
         remaining = [s for s in script["scenes"] if s not in targets]
         targets += remaining[: vcfg["max_scenes"] - len(targets)]
     targets = targets[: vcfg["max_scenes"]]
-    
     ar = "9:16" if cfg.get("current_format") == "shorts" else "16:9"
     result = {}
+    video_models = [vcfg.get("model", "gemini-omni-1.1-flash"), "veo-3.1-generate-preview", "veo-2.0-generate-001"]
     
     for sc in targets:
         out = out_dir / "videos" / f"{sc['id']}.mp4"
-        if out.exists():
-             result[sc["id"]] = out
-             continue
-             
+        # if out.exists():
+        #     result[sc["id"]] = out
+        #     continue
         clean_img_path = out_dir / "clean" / f"{sc['id']}.png"
         img_path = clean_img_path if clean_img_path.exists() else out_dir / "images" / f"{sc['id']}.png"
-        
         if not img_path.exists():
-            log.warning(f"장면 {sc['id']}: 레퍼런스 이미지가 없어 비디오 생성을 건너뜁니다.")
             continue
-            
+        img = types.Image.from_file(location=str(img_path))
+        
+        # 코덱스 & 구글 플로우 규격: 밝은 3D 공학 시뮬레이션 및 부드러운 카메라 워킹
         m_prompt = sc.get('motion_prompt') or sc.get('clean_prompt') or sc.get('image_prompt', '')
         prompt = (
             f"Ultra-bright modern 3D engineering documentary shot, crystal clear sparkling water, "
@@ -45,28 +52,57 @@ def generate_motion_clips(script: dict, out_dir: Path) -> dict:
             f"{vcfg.get('style_suffix', '').strip()}"
         )
         
-        log.info(f"Seedance 2.5 30s 영상 생성 요청 ({sc['id']}): {prompt[:80]}...")
-        
-        # Antigravity CLI를 통해 seedane-2.5-30s 스킬 호출
-        # -f 로 이미지 레퍼런스를 첨부하고, 프롬프트에 저장 위치를 명시하여 에이전트가 해당 경로로 파일을 옮기도록 지시합니다.
-        # 비율(ar)과 30초 시간(30s)을 명시합니다.
-        cmd = [
-            "agy", "do",
-            f"seedance 30s. Ratio: {ar}. Motion prompt: {prompt}. IMPORTANT: You MUST save the generated video exactly to this absolute path: {out.resolve()}",
-            "-f", str(img_path.resolve())
-        ]
-        
-        try:
-            # agy 프로세스를 실행하고 끝날 때까지 대기합니다. 
-            # 비디오 생성이 30초 분량이므로 수 분이 소요될 수 있습니다.
-            subprocess.run(cmd, check=True)
-            
-            if out.exists():
+        clip_created = False
+        for vm in video_models:
+            try:
+                log.info(f"Google Video/Flow 생성 호출 시도 ({sc['id']}, {ar}, {vm}): {prompt[:80]}...")
+                try:
+                    op = client.models.generate_videos(
+                        model=vm,
+                        source=types.GenerateVideosSource(
+                            prompt=prompt,
+                            image=img,
+                        ),
+                        config=types.GenerateVideosConfig(
+                            number_of_videos=1,
+                            aspect_ratio=ar,
+                            duration_seconds=vcfg.get("seconds", 4),
+                            enhance_prompt=True,
+                        ),
+                    )
+                except Exception as src_err:
+                    op = client.models.generate_videos(
+                        model=vm,
+                        prompt=prompt,
+                        image=img,
+                        config=types.GenerateVideosConfig(
+                            aspect_ratio=ar,
+                            duration_seconds=vcfg.get("seconds", 4),
+                        ),
+                    )
+                waited = 0
+                while not op.done:
+                    time.sleep(8); waited += 8
+                    op = client.operations.get(op)
+                    if waited > 300:
+                        raise TimeoutError("영상 생성 시간 초과")
+                vid = op.response.generated_videos[0]
+                try:
+                    client.files.download(file=vid.video, destination=str(out))
+                except Exception:
+                    if getattr(vid.video, "video_bytes", None):
+                        out.write_bytes(vid.video.video_bytes)
+                    elif hasattr(vid.video, "save"):
+                        vid.video.save(str(out))
+                    else:
+                        raise
                 result[sc["id"]] = out
-                log.info(f"비디오 클립 {sc['id']} 생성 성공 (Seedance 2.5 30s)")
-            else:
-                log.warning(f"명령어는 성공했으나 {out.name} 파일이 생성되지 않았습니다.")
-        except subprocess.CalledProcessError as e:
-            log.warning(f"Seedance 2.5 클립 {sc['id']} 생성 실패 ({e}) → 고화질 3D 패럴랙스 렌더로 대체")
+                log.info(f"비디오 클립 {sc['id']} 생성 성공 ({vm})")
+                clip_created = True
+                break
+            except Exception as e:
+                log.warning(f"모델 {vm} 클립 {sc['id']} 생성 실패 ({e}) → 다음 모델 시도")
                 
+        if not clip_created:
+            log.info(f"장면 {sc['id']}: AI 비디오 생성 패스 → 고화질 3D 패럴랙스 렌더로 대체")
     return result
